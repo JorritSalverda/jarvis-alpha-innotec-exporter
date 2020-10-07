@@ -90,6 +90,19 @@ func TestGetItemFromResponse(t *testing.T) {
 
 		assert.NotNil(t, err)
 	})
+
+	t.Run("ReturnsValueForItemWithoutUnitForPressure", func(t *testing.T) {
+
+		client := client{}
+
+		response := `<Content><item id='0x4e7944'><name>ASD</name><value>Aan</value></item><item id='0x4ffbfc'><name>EVU</name><value>Aan</value></item><item id='0x4ef3b4'><name>HD</name><value>Uit</value></item><item id='0x4dac64'><name>MOT</name><value>Aan</value></item><item id='0x4ca4c4'><name>SWT</name><value>Uit</value></item><item id='0x4fa864'><name>Analoog-In 21</name><value>0.00 V</value></item><item id='0x4d5f1c'><name>Analoog-In 22</name><value>0.00 V</value></item><item id='0x4e6a3c'><name>HD</name><value>8.10 bar</value></item><item id='0x4ca47c'><name>ND</name><value>8.38 bar</value></item><item id='0x4e8004'><name>Debiet</name><value>1200 l/h</value></item><name>Ingangen</name></Content>`
+
+		// act
+		value, err := client.getItemFromResponse("HD", []byte(response))
+
+		assert.Nil(t, err)
+		assert.Equal(t, float64(8.10), value)
+	})
 }
 
 func TestGetNavigationFromResponse(t *testing.T) {
