@@ -311,7 +311,7 @@ func (c *client) getItemFromResponse(item string, response []byte) (value float6
 
 	value, err = strconv.ParseFloat(matches[1], 64)
 	if err != nil {
-		return
+		return value, fmt.Errorf("Failed parsing float from item %v value %v: %w", item, value, err)
 	}
 
 	return
