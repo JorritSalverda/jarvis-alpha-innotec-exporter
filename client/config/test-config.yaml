@@ -1,0 +1,20 @@
+location: My Home
+sampleConfigs:
+- deviceName: Alpha Innotec SWCV 92K3
+  sampleName: Aanvoer
+  aggregationLevel: AGGREGATION_LEVEL_DEVICE
+  metricType: METRIC_TYPE_GAUGE
+  sampleType: SAMPLE_TYPE_TEMPERATURE
+  sampleUnit: SAMPLE_UNIT_DEGREE_CELCIUS
+  valueMultiplier: 1
+  navigation: Informatie > Temperaturen
+  item: Aanvoer
+- deviceName: Alpha Innotec SWCV 92K3
+  sampleName: Retour
+  aggregationLevel: AGGREGATION_LEVEL_DEVICE
+  metricType: METRIC_TYPE_GAUGE
+  sampleType: SAMPLE_TYPE_TEMPERATURE
+  sampleUnit: SAMPLE_UNIT_DEGREE_CELCIUS
+  valueMultiplier: 1
+  navigation: Informatie > Temperaturen
+  item: Retour

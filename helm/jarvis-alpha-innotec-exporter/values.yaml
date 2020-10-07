@@ -1,4 +1,4 @@
-# Default values for alpha-innotec-bigquery-exporter.
+# Default values for jarvis-alpha-innotec-exporter.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -7,13 +7,34 @@ cronjob:
   concurrencyPolicy: Forbid
 
 config:
-  heatpumpHostIP: 127.0.0.1
-  heatpumpHostPort: 502
-  heatpumpUnitID: 3
+  websocketHostIP: 127.0.0.1
+  websocketHostPort: 8214
+  websocketLoginCode: 999999
   bqEnable: false
   bqProjectID: gcp-project-id
-  bqDataset: my-dataset
-  bqTable: my-table
+  bqDataset: jarvis
+  bqTable: jarvis_measurements
+  configYaml: |
+    location: My Home
+    sampleConfigs:
+    - deviceName: Alpha Innotec SWCV 92K3
+      sampleName: Aanvoer
+      aggregationLevel: AGGREGATION_LEVEL_DEVICE
+      metricType: METRIC_TYPE_GAUGE
+      sampleType: SAMPLE_TYPE_TEMPERATURE
+      sampleUnit: SAMPLE_UNIT_DEGREE_CELCIUS
+      valueMultiplier: 1
+      navigation: Informatie > Temperaturen
+      item: Aanvoer
+    - deviceName: Alpha Innotec SWCV 92K3
+      sampleName: Retour
+      aggregationLevel: AGGREGATION_LEVEL_DEVICE
+      metricType: METRIC_TYPE_GAUGE
+      sampleType: SAMPLE_TYPE_TEMPERATURE
+      sampleUnit: SAMPLE_UNIT_DEGREE_CELCIUS
+      valueMultiplier: 1
+      navigation: Informatie > Temperaturen
+      item: Retour
 
 secret:
   gcpServiceAccountKeyfile: '{}'
@@ -21,7 +42,7 @@ secret:
 logFormat: json
 
 image:
-  repository: jsalverda/alpha-innotec-bigquery-exporter
+  repository: jsalverda/jarvis-alpha-innotec-exporter
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""

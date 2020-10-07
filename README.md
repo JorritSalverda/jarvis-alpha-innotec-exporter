@@ -4,13 +4,13 @@ To install this application using Helm run the following commands:
 
 ```bash
 helm repo add jorritsalverda https://helm.jorritsalverda.com
-kubectl create namespace alpha-innotec-bigquery-exporter
+kubectl create namespace jarvis-alpha-innotec-exporter
 
 helm upgrade \
-  alpha-innotec-bigquery-exporter \
-  jorritsalverda/alpha-innotec-bigquery-exporter \
+  jarvis-alpha-innotec-exporter \
+  jorritsalverda/jarvis-alpha-innotec-exporter \
   --install \
-  --namespace alpha-innotec-bigquery-exporter \
+  --namespace jarvis-alpha-innotec-exporter \
   --set secret.gcpServiceAccountKeyfile='{abc: blabla}' \
   --wait
 ```

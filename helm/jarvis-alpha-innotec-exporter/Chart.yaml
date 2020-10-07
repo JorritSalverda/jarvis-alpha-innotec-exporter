@@ -1,5 +1,5 @@
 apiVersion: v2
-name: alpha-innotec-bigquery-exporter
+name: jarvis-alpha-innotec-exporter
 description: Stores Alpha Innotec heatpump readings in BigQuery
 
 # A chart can be either an 'application' or a 'library' chart.

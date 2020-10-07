@@ -1,9 +1,9 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
   labels:
-    {{- include "alpha-innotec-bigquery-exporter.labels" . | nindent 4 }}
+    {{- include "jarvis-alpha-innotec-exporter.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.cronjob.schedule | quote }}
   concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }}
@@ -23,14 +23,14 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}  
           labels:
-            {{- include "alpha-innotec-bigquery-exporter.labels" . | nindent 12 }}
+            {{- include "jarvis-alpha-innotec-exporter.labels" . | nindent 12 }}
         spec:
           restartPolicy: Never
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          serviceAccountName: {{ include "alpha-innotec-bigquery-exporter.serviceAccountName" . }}
+          serviceAccountName: {{ include "jarvis-alpha-innotec-exporter.serviceAccountName" . }}
           securityContext:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
           containers:
@@ -42,43 +42,43 @@ spec:
             env:
             - name: ESTAFETTE_LOG_FORMAT
               value: {{ .Values.logFormat }}
-            - name: HEATPUMP_HOST_IP
+            - name: WEBSOCKET_HOST_IP
               valueFrom:
                 configMapKeyRef:
-                  key: heatpump-host-ip
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
-            - name: HEATPUMP_HOST_PORT
+                  key: websocket-host-ip
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
+            - name: WEBSOCKET_HOST_PORT
               valueFrom:
                 configMapKeyRef:
-                  key: heatpump-host-port
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
-            - name: HEATPUMP_UNIT_ID
+                  key: websocket-host-port
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
+            - name: WEBSOCKET_LOGIN_CODE
               valueFrom:
                 configMapKeyRef:
-                  key: heatpump-unit-id
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+                  key: websocket-login-code
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
             - name: BQ_ENABLE
               valueFrom:
                 configMapKeyRef:
                   key: bq-enable
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
             - name: BQ_PROJECT_ID
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
                   key: bq-project-id
             - name: BQ_DATASET
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
                   key: bq-dataset
             - name: BQ_TABLE
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
                   key: bq-table
             - name: MEASUREMENT_FILE_CONFIG_MAP_NAME
-              value: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+              value: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /secrets/keyfile.json
             resources:
@@ -104,8 +104,8 @@ spec:
           volumes:
           - name: configs
             configMap:
-              name: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+              name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
           - name: secrets
             secret:
               defaultMode: 420
-              secretName: {{ include "alpha-innotec-bigquery-exporter.fullname" . }}
+              secretName: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
