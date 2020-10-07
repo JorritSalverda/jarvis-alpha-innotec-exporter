@@ -11,15 +11,26 @@ type Config struct {
 
 type ConfigSample struct {
 	// default jarvis config for sample
-	DeviceName       string                       `yaml:"deviceName"`
-	SampleName       string                       `yaml:"sampleName"`
-	AggregationLevel contractsv1.AggregationLevel `yaml:"aggregationLevel"`
-	MetricType       contractsv1.MetricType       `yaml:"metricType"`
-	SampleType       contractsv1.SampleType       `yaml:"sampleType"`
-	SampleUnit       contractsv1.SampleUnit       `yaml:"sampleUnit"`
+	EntityType contractsv1.EntityType `yaml:"entityType"`
+	EntityName string                 `yaml:"entityName"`
+	SampleType contractsv1.SampleType `yaml:"sampleType"`
+	SampleName string                 `yaml:"sampleName"`
+	MetricType contractsv1.MetricType `yaml:"metricType"`
 
 	// alpha innotec specific config for sample
 	ValueMultiplier float64 `yaml:"valueMultiplier"`
 	Navigation      string  `yaml:"navigation"`
 	Item            string  `yaml:"item"`
+}
+
+func (c *Config) SetDefaults() {
+	for _, sc := range c.SampleConfigs {
+		sc.SetDefaults()
+	}
+}
+
+func (sc *ConfigSample) SetDefaults() {
+	if sc.ValueMultiplier == 0 {
+		sc.ValueMultiplier = 1
+	}
 }

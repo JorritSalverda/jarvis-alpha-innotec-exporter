@@ -32,5 +32,7 @@ func (c *client) ReadConfigFromFile(path string) (config apiv1.Config, err error
 		return config, err
 	}
 
+	config.SetDefaults()
+
 	return
 }

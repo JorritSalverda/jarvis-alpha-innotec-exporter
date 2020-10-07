@@ -42,15 +42,14 @@ func TestGetMeasurement(t *testing.T) {
 			Location: "My address",
 			SampleConfigs: []apiv1.ConfigSample{
 				{
-					DeviceName:       "Alpha Innotec SWCV 92K3",
-					SampleName:       "Aanvoer",
-					AggregationLevel: contractsv1.AggregationLevel_AGGREGATION_LEVEL_DEVICE,
-					MetricType:       "METRIC_TYPE_GAUGE",
-					SampleType:       "SAMPLE_TYPE_TEMPERATURE",
-					SampleUnit:       "SAMPLE_UNIT_DEGREE_CELCIUS",
-					ValueMultiplier:  1,
-					Navigation:       "Informatie > Temperaturen",
-					Item:             "Aanvoer",
+					EntityType:      "ENTITY_TYPE_DEVICE",
+					EntityName:      "Alpha Innotec SWCV 92K3",
+					SampleType:      "SAMPLE_TYPE_TEMPERATURE",
+					SampleName:      "Aanvoer",
+					MetricType:      "METRIC_TYPE_GAUGE",
+					ValueMultiplier: 1,
+					Navigation:      "Informatie > Temperaturen",
+					Item:            "Aanvoer",
 				},
 			},
 		}
@@ -60,10 +59,9 @@ func TestGetMeasurement(t *testing.T) {
 
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(measurement.Samples))
-		assert.Equal(t, "Alpha Innotec SWCV 92K3", measurement.Samples[0].DeviceName)
+		assert.Equal(t, "Alpha Innotec SWCV 92K3", measurement.Samples[0].EntityName)
 		assert.Equal(t, "Aanvoer", measurement.Samples[0].SampleName)
 		assert.Equal(t, contractsv1.MetricType_METRIC_TYPE_GAUGE, measurement.Samples[0].MetricType)
-
 	})
 }
 

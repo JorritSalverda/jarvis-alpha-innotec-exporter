@@ -17,21 +17,19 @@ config:
   configYaml: |
     location: My Home
     sampleConfigs:
-    - deviceName: Alpha Innotec SWCV 92K3
-      sampleName: Aanvoer
-      aggregationLevel: AGGREGATION_LEVEL_DEVICE
-      metricType: METRIC_TYPE_GAUGE
+    - entityType: ENTITY_TYPE_DEVICE
+      entityName: Alpha Innotec SWCV 92K3
       sampleType: SAMPLE_TYPE_TEMPERATURE
-      sampleUnit: SAMPLE_UNIT_DEGREE_CELCIUS
+      sampleName: Aanvoer
+      metricType: METRIC_TYPE_GAUGE
       valueMultiplier: 1
       navigation: Informatie > Temperaturen
       item: Aanvoer
-    - deviceName: Alpha Innotec SWCV 92K3
-      sampleName: Retour
-      aggregationLevel: AGGREGATION_LEVEL_DEVICE
-      metricType: METRIC_TYPE_GAUGE
+    - entityType: ENTITY_TYPE_DEVICE
+      entityName: Alpha Innotec SWCV 92K3
       sampleType: SAMPLE_TYPE_TEMPERATURE
-      sampleUnit: SAMPLE_UNIT_DEGREE_CELCIUS
+      sampleName: Retour
+      metricType: METRIC_TYPE_GAUGE
       valueMultiplier: 1
       navigation: Informatie > Temperaturen
       item: Retour
