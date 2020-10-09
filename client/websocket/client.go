@@ -24,7 +24,7 @@ import (
 
 // Client is the interface for connecting to a websocket device via ethernet
 type Client interface {
-	GetMeasurement(config apiv1.Config) (measurement contractsv1.Measurement, err error)
+	GetMeasurement(config apiv1.Config, lastMeasurement *contractsv1.Measurement) (measurement contractsv1.Measurement, err error)
 }
 
 // NewClient returns new websocket.Client
@@ -57,7 +57,7 @@ type client struct {
 	teardown         bool
 }
 
-func (c *client) GetMeasurement(config apiv1.Config) (measurement contractsv1.Measurement, err error) {
+func (c *client) GetMeasurement(config apiv1.Config, lastMeasurement *contractsv1.Measurement) (measurement contractsv1.Measurement, err error) {
 
 	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("%v:%v", c.host, c.port), Path: "/"}
 
@@ -126,6 +126,10 @@ func (c *client) GetMeasurement(config apiv1.Config) (measurement contractsv1.Me
 
 	groupedSampleConfigs := c.groupSampleConfigsPerNavigation(config.SampleConfigs)
 	measurement.Samples, err = c.getSamples(config, groupedSampleConfigs, connection, navigation)
+
+	if lastMeasurement != nil {
+		measurement.Samples = c.sanitizeSamples(measurement.Samples, lastMeasurement.Samples)
+	}
 
 	log.Info().Msgf("Done issueing commands, stopping send/receive handlers...")
 	c.teardown = true
@@ -338,6 +342,34 @@ func (c *client) getItemFromResponse(item string, response []byte) (value float6
 	value, err = strconv.ParseFloat(matches[1], 64)
 	if err != nil {
 		return value, fmt.Errorf("Failed parsing float from item %v value %v: %w", item, value, err)
+	}
+
+	return
+}
+
+func (c *client) sanitizeSamples(currentSamples, lastSamples []*contractsv1.Sample) (sanitizeSamples []*contractsv1.Sample) {
+
+	sanitizeSamples = []*contractsv1.Sample{}
+	for _, cs := range currentSamples {
+		// check if there's a corresponding sample in lastSamples and see if the difference with it's value isn't too large
+		sanitize := false
+		for _, ls := range lastSamples {
+			if cs.EntityType == ls.EntityType &&
+				cs.EntityName == ls.EntityName &&
+				cs.SampleType == ls.SampleType &&
+				cs.SampleName == ls.SampleName &&
+				cs.MetricType == cs.MetricType {
+				if cs.MetricType == contractsv1.MetricType_METRIC_TYPE_COUNTER && cs.Value/ls.Value > 1.1 {
+					log.Warn().Msgf("Value for %v is more than 10 percent larger than the last sampled value %v, keeping previous value instead", cs, ls.Value)
+					sanitizeSamples = append(sanitizeSamples, ls)
+				}
+
+				break
+			}
+		}
+		if !sanitize {
+			sanitizeSamples = append(sanitizeSamples, cs)
+		}
 	}
 
 	return

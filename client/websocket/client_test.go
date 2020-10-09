@@ -23,7 +23,7 @@ func TestGetMeasurement(t *testing.T) {
 		}
 
 		// act
-		measurement, err := client.GetMeasurement(config)
+		measurement, err := client.GetMeasurement(config, nil)
 
 		assert.Nil(t, err)
 		assert.Equal(t, "My address", measurement.Location)
@@ -55,7 +55,7 @@ func TestGetMeasurement(t *testing.T) {
 		}
 
 		// act
-		measurement, err := client.GetMeasurement(config)
+		measurement, err := client.GetMeasurement(config, nil)
 
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(measurement.Samples))

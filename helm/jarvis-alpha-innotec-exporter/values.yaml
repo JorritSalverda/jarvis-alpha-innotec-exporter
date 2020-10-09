@@ -11,6 +11,7 @@ config:
   websocketHostPort: 8214
   websocketLoginCode: 999999
   bqEnable: false
+  bqInit: true
   bqProjectID: gcp-project-id
   bqDataset: jarvis
   bqTable: jarvis_measurements
