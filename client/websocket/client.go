@@ -25,7 +25,6 @@ import (
 // Client is the interface for connecting to a websocket device via ethernet
 type Client interface {
 	GetMeasurement(config apiv1.Config) (measurement contractsv1.Measurement, err error)
-	GetSample(config apiv1.Config, sampleConfig apiv1.ConfigSample, connection *gwebsocket.Conn, navigation Navigation) (sample contractsv1.Sample, err error)
 }
 
 // NewClient returns new websocket.Client
@@ -124,13 +123,8 @@ func (c *client) GetMeasurement(config apiv1.Config) (measurement contractsv1.Me
 		return
 	}
 
-	for _, sc := range config.SampleConfigs {
-		sample, sampleErr := c.GetSample(config, sc, connection, navigation)
-		if sampleErr != nil {
-			return measurement, sampleErr
-		}
-		measurement.Samples = append(measurement.Samples, &sample)
-	}
+	groupedSampleConfigs := c.groupSampleConfigsPerNavigation(config.SampleConfigs)
+	measurement.Samples, err = c.GetSamples(config, groupedSampleConfigs, connection, navigation)
 
 	log.Info().Msgf("Done issueing commands, stopping send/receive handlers...")
 	close(c.interrupt)
@@ -139,29 +133,60 @@ func (c *client) GetMeasurement(config apiv1.Config) (measurement contractsv1.Me
 	return
 }
 
-func (c *client) GetSample(config apiv1.Config, sampleConfig apiv1.ConfigSample, connection *gwebsocket.Conn, navigation Navigation) (sample contractsv1.Sample, err error) {
+func (c *client) GetSamples(config apiv1.Config, groupedSampleConfigs map[string][]apiv1.ConfigSample, connection *gwebsocket.Conn, navigation Navigation) (samples []*contractsv1.Sample, err error) {
 
-	// init sample from config
-	sample = contractsv1.Sample{
-		EntityType: sampleConfig.EntityType,
-		EntityName: sampleConfig.EntityName,
-		SampleType: sampleConfig.SampleType,
-		SampleName: sampleConfig.SampleName,
-		MetricType: sampleConfig.MetricType,
+	samples = []*contractsv1.Sample{}
+
+	for nav, sampleConfigs := range groupedSampleConfigs {
+
+		// get id for navigation
+		navigationID, e := navigation.GetNavigationItemID(nav)
+		if e != nil {
+			return samples, e
+		}
+
+		// get response for navigation item
+		response, e := c.sendAndAwait(fmt.Sprintf("GET;%v", navigationID))
+		if e != nil {
+			return samples, fmt.Errorf("Failed navigating to %v: %w", navigationID, e)
+		}
+
+		// get all requested values from navigation response
+		for _, sc := range sampleConfigs {
+			value, e := c.getItemFromResponse(sc.Item, response)
+			if e != nil {
+				return samples, e
+			}
+
+			// init sample from config
+			sample := contractsv1.Sample{
+				EntityType: sc.EntityType,
+				EntityName: sc.EntityName,
+				SampleType: sc.SampleType,
+				SampleName: sc.SampleName,
+				MetricType: sc.MetricType,
+			}
+
+			// convert sample to float and correct
+			sample.Value = value * sc.ValueMultiplier
+
+			samples = append(samples, &sample)
+		}
 	}
 
-	navigationID, err := navigation.GetNavigationItemID(sampleConfig.Navigation)
-	if err != nil {
-		return
-	}
+	return
+}
 
-	value, err := c.getSampleValue(navigationID, sampleConfig.Item)
-	if err != nil {
-		return
-	}
+func (c *client) groupSampleConfigsPerNavigation(sampleConfigs []apiv1.ConfigSample) (groupedSampleConfigs map[string][]apiv1.ConfigSample) {
 
-	// convert sample to float and correct
-	sample.Value = value * sampleConfig.ValueMultiplier
+	groupedSampleConfigs = map[string][]apiv1.ConfigSample{}
+
+	for _, sc := range sampleConfigs {
+		if _, ok := groupedSampleConfigs[sc.Navigation]; !ok {
+			groupedSampleConfigs[sc.Navigation] = []apiv1.ConfigSample{}
+		}
+		groupedSampleConfigs[sc.Navigation] = append(groupedSampleConfigs[sc.Navigation], sc)
+	}
 
 	return
 }
@@ -257,21 +282,6 @@ func (c *client) login() (navigation Navigation, err error) {
 	}
 
 	navigation, err = c.getNavigationFromResponse(response)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (c *client) getSampleValue(navigationID, item string) (value float64, err error) {
-
-	response, err := c.sendAndAwait(fmt.Sprintf("GET;%v", navigationID))
-	if err != nil {
-		return 0, fmt.Errorf("Failed navigating to %v: %w", navigationID, err)
-	}
-
-	value, err = c.getItemFromResponse(item, response)
 	if err != nil {
 		return
 	}
