@@ -54,6 +54,7 @@ type client struct {
 	responseChannel chan []byte
 
 	awaitingResponse bool
+	teardown         bool
 }
 
 func (c *client) GetMeasurement(config apiv1.Config) (measurement contractsv1.Measurement, err error) {
@@ -124,20 +125,23 @@ func (c *client) GetMeasurement(config apiv1.Config) (measurement contractsv1.Me
 	}
 
 	groupedSampleConfigs := c.groupSampleConfigsPerNavigation(config.SampleConfigs)
-	measurement.Samples, err = c.GetSamples(config, groupedSampleConfigs, connection, navigation)
+	measurement.Samples, err = c.getSamples(config, groupedSampleConfigs, connection, navigation)
 
 	log.Info().Msgf("Done issueing commands, stopping send/receive handlers...")
+	c.teardown = true
 	close(c.interrupt)
 	waitGroup.Wait()
 
 	return
 }
 
-func (c *client) GetSamples(config apiv1.Config, groupedSampleConfigs map[string][]apiv1.ConfigSample, connection *gwebsocket.Conn, navigation Navigation) (samples []*contractsv1.Sample, err error) {
+func (c *client) getSamples(config apiv1.Config, groupedSampleConfigs map[string][]apiv1.ConfigSample, connection *gwebsocket.Conn, navigation Navigation) (samples []*contractsv1.Sample, err error) {
 
 	samples = []*contractsv1.Sample{}
 
 	for nav, sampleConfigs := range groupedSampleConfigs {
+
+		log.Info().Msgf("Fetching values from page %v...", nav)
 
 		// get id for navigation
 		navigationID, e := navigation.GetNavigationItemID(nav)
@@ -150,6 +154,8 @@ func (c *client) GetSamples(config apiv1.Config, groupedSampleConfigs map[string
 		if e != nil {
 			return samples, fmt.Errorf("Failed navigating to %v: %w", navigationID, e)
 		}
+
+		log.Info().Msgf("Reading %v values from response for page %v...", len(sampleConfigs), nav)
 
 		// get all requested values from navigation response
 		for _, sc := range sampleConfigs {
@@ -196,6 +202,11 @@ func (c *client) receiveResponse(connection *gwebsocket.Conn) (err error) {
 	for {
 		var message []byte
 		_, message, err = connection.ReadMessage()
+		if c.teardown {
+			log.Info().Msg("Completing teardown of serial port listener")
+			return nil
+		}
+
 		if err != nil {
 			if errors.Is(err, gwebsocket.ErrCloseSent) {
 				log.Debug().Msg("Connection close is sent")
@@ -221,6 +232,7 @@ func (c *client) sendCommands(connection *gwebsocket.Conn) (err error) {
 		case command := <-c.commandChannel:
 			err = connection.WriteMessage(gwebsocket.TextMessage, []byte(command))
 			if err != nil {
+
 				log.Warn().Err(err).Msg("write error")
 				return
 			}
@@ -303,7 +315,7 @@ func (c *client) getItemFromResponse(item string, response []byte) (value float6
 
 	// <Content><item id='0x4816ac'><name>Aanvoer</name><value>22.0°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>
 
-	pattern := fmt.Sprintf(`<item id='[^']*'><name>%v<\/name><value>([0-9.]+)[^<]*<\/value><\/item>`, item)
+	pattern := fmt.Sprintf(`<item id='[^']*'><name>%v<\/name><value>([0-9.]+|---)[^<]*<\/value><\/item>`, item)
 
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -317,6 +329,10 @@ func (c *client) getItemFromResponse(item string, response []byte) (value float6
 
 	if len(matches) != 2 {
 		return value, fmt.Errorf("No match for item %v", item)
+	}
+
+	if matches[1] == "---" {
+		return value, nil
 	}
 
 	value, err = strconv.ParseFloat(matches[1], 64)
