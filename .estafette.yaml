@@ -52,18 +52,18 @@ stages:
     repositories:
     - jsalverda
 
-  test-helm-chart:
-    services:
-    - name: kubernetes
-      image: bsycorp/kind:latest-1.17
-      readiness:
-        path: /kubernetes-ready
-        port: 10080
-    image: extensions/helm:stable
-    action: test
-    values: |-
-      secret:
-        gcpServiceAccountKeyfile: '{}'
+  # test-helm-chart:
+  #   services:
+  #   - name: kubernetes
+  #     image: bsycorp/kind:latest-1.17
+  #     readiness:
+  #       path: /kubernetes-ready
+  #       port: 10080
+  #   image: extensions/helm:stable
+  #   action: test
+  #   values: |-
+  #     secret:
+  #       gcpServiceAccountKeyfile: '{}'
 
   clone-charts-repo:
     image: extensions/git-clone:stable
