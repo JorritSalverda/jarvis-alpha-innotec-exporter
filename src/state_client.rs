@@ -1,5 +1,6 @@
 use crate::model::Measurement;
 
+use derivative::Derivative;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     api::{Api, PostParams},
@@ -10,12 +11,11 @@ use std::env;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
-use derivative::Derivative;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct StateClientConfig {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     kube_client: kube::Client,
     measurement_file_path: String,
     measurement_file_configmap_name: String,
@@ -30,12 +30,12 @@ impl StateClientConfig {
         current_namespace: String,
     ) -> Result<Self, Box<dyn Error>> {
         let config = Self {
-          kube_client,
-          measurement_file_path,
-          measurement_file_configmap_name,
-          current_namespace,
+            kube_client,
+            measurement_file_path,
+            measurement_file_configmap_name,
+            current_namespace,
         };
-        
+
         println!("{:?}", config);
 
         Ok(config)

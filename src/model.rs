@@ -74,11 +74,11 @@ pub struct Config {
 }
 
 impl Config {
-  pub fn set_defaults(&mut self) {
-    for sample_config in self.sample_configs.iter_mut() {
-      sample_config.set_defaults()
+    pub fn set_defaults(&mut self) {
+        for sample_config in self.sample_configs.iter_mut() {
+            sample_config.set_defaults()
+        }
     }
-  }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -98,9 +98,9 @@ pub struct ConfigSample {
 }
 
 impl ConfigSample {
-  pub fn set_defaults(&mut self) {
-    if self.value_multiplier == 0.0 {
-      self.value_multiplier = 1.0;
+    pub fn set_defaults(&mut self) {
+        if self.value_multiplier == 0.0 {
+            self.value_multiplier = 1.0;
+        }
     }
-  }
 }

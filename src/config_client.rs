@@ -12,7 +12,7 @@ pub struct ConfigClientConfig {
 impl ConfigClientConfig {
     pub fn new(config_path: String) -> Result<Self, Box<dyn Error>> {
         let config = Self { config_path };
-        
+
         println!("{:?}", config);
 
         Ok(config)
@@ -54,7 +54,7 @@ impl ConfigClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{EntityType,SampleType,MetricType};
+    use crate::model::{EntityType, MetricType, SampleType};
 
     #[test]
     fn read_config_from_file_returns_deserialized_test_file() {
@@ -66,13 +66,22 @@ mod tests {
         assert_eq!(config.location, "My Home".to_string());
         assert_eq!(config.sample_configs.len(), 2);
         assert_eq!(config.sample_configs[0].entity_type, EntityType::Device);
-        assert_eq!(config.sample_configs[0].entity_name, "Alpha Innotec SWCV 92K3".to_string());
-        assert_eq!(config.sample_configs[0].sample_type, SampleType::Temperature);
+        assert_eq!(
+            config.sample_configs[0].entity_name,
+            "Alpha Innotec SWCV 92K3".to_string()
+        );
+        assert_eq!(
+            config.sample_configs[0].sample_type,
+            SampleType::Temperature
+        );
         assert_eq!(config.sample_configs[0].sample_name, "Aanvoer".to_string());
         assert_eq!(config.sample_configs[0].metric_type, MetricType::Gauge);
 
         assert_eq!(config.sample_configs[0].value_multiplier, 1.0);
-        assert_eq!(config.sample_configs[0].navigation, "Informatie > Temperaturen".to_string());
+        assert_eq!(
+            config.sample_configs[0].navigation,
+            "Informatie > Temperaturen".to_string()
+        );
         assert_eq!(config.sample_configs[0].item, "Aanvoer".to_string());
     }
 }

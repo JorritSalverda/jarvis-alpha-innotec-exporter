@@ -2,8 +2,8 @@ use std::error::Error;
 
 use crate::bigquery_client::BigqueryClient;
 use crate::config_client::ConfigClient;
-use crate::websocket_client::WebsocketClient;
 use crate::state_client::StateClient;
+use crate::websocket_client::WebsocketClient;
 
 pub struct ExporterServiceConfig {
     config_client: ConfigClient,

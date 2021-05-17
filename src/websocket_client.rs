@@ -1,13 +1,16 @@
-use crate::model::{Config, Measurement, MetricType, Sample, SampleType};
+use crate::model::{Config, ConfigSample, Measurement, MetricType, Sample};
 
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use serde_json;
+use regex::Regex;
+use serde::Deserialize;
+use serde_xml_rs::from_str;
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
-use std::net::{SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
 use uuid::Uuid;
+
+use websocket::client::ClientBuilder;
+use websocket::OwnedMessage;
 
 #[derive(Debug)]
 pub struct WebsocketClientConfig {
@@ -17,9 +20,17 @@ pub struct WebsocketClientConfig {
 }
 
 impl WebsocketClientConfig {
-    pub fn new(host_address: String, host_port: u32, login_code: String) -> Result<Self, Box<dyn Error>> {
-        let config = Self { host_address, host_port, login_code };
-        
+    pub fn new(
+        host_address: String,
+        host_port: u32,
+        login_code: String,
+    ) -> Result<Self, Box<dyn Error>> {
+        let config = Self {
+            host_address,
+            host_port,
+            login_code,
+        };
+
         println!("{:?}", config);
 
         Ok(config)
@@ -27,7 +38,9 @@ impl WebsocketClientConfig {
 
     pub fn from_env() -> Result<Self, Box<dyn Error>> {
         let host_address = env::var("WEBSOCKET_HOST_IP").unwrap_or("127.0.0.1".to_string());
-        let host_port: u32 = env::var("WEBSOCKET_HOST_PORT").unwrap_or("8214".to_string()).parse()?;
+        let host_port: u32 = env::var("WEBSOCKET_HOST_PORT")
+            .unwrap_or("8214".to_string())
+            .parse()?;
         let login_code = env::var("WEBSOCKET_LOGIN_CODE")?;
 
         Self::new(host_address, host_port, login_code)
@@ -58,40 +71,29 @@ impl WebsocketClient {
             measured_at_time: Utc::now(),
         };
 
-        // println!("Discovering devices...");
-        // let devices = self.discover_devices()?;
+        let connection = ClientBuilder::new(&format!(
+            "ws://{}:{}",
+            self.config.host_address, self.config.host_port
+        ))?
+        .origin(format!("http://{}", self.config.host_address))
+        .add_protocol("Lux_WS")
+        .connect_insecure()?;
 
-        // for device in devices.iter() {
-        //     match &device.system {
-        //         Some(system) => {
-        //             match &device.e_meter {
-        //                 Some(e_meter) => {
-        //                     // counter
-        //                     measurement.samples.push(Sample {
-        //                         entity_type: config.entity_type,
-        //                         entity_name: config.entity_name.clone(),
-        //                         sample_type: SampleType::ElectricityConsumption,
-        //                         sample_name: system.info.alias.clone(),
-        //                         metric_type: MetricType::Counter,
-        //                         value: e_meter.real_time.total_watt_hour * 3600.0,
-        //                     });
+        let (mut receiver, mut sender) = connection.split()?;
 
-        //                     // gauge
-        //                     measurement.samples.push(Sample {
-        //                         entity_type: config.entity_type,
-        //                         entity_name: config.entity_name.clone(),
-        //                         sample_type: SampleType::ElectricityConsumption,
-        //                         sample_name: system.info.alias.clone(),
-        //                         metric_type: MetricType::Gauge,
-        //                         value: e_meter.real_time.power_milli_watt / 1000.0,
-        //                     });
-        //                 }
-        //                 None => (),
-        //             }
-        //         }
-        //         None => (),
-        //     }
-        // }
+        // login
+        let navigation = self.login(&mut receiver, &mut sender)?;
+
+        // get measurement samples
+        let grouped_sample_configs =
+            self.group_sample_configs_per_navigation(config.sample_configs);
+
+        measurement.samples = self.get_samples(
+            grouped_sample_configs,
+            &mut receiver,
+            &mut sender,
+            navigation,
+        )?;
 
         match last_measurement {
             Some(lm) => {
@@ -105,336 +107,160 @@ impl WebsocketClient {
         Ok(measurement)
     }
 
+    fn group_sample_configs_per_navigation(
+        &self,
+        sample_configs: Vec<ConfigSample>,
+    ) -> HashMap<String, Vec<ConfigSample>> {
+        let mut grouped_sample_configs: HashMap<String, Vec<ConfigSample>> = HashMap::new();
 
+        //   for _, sc := range sampleConfigs {
+        //     if _, ok := groupedSampleConfigs[sc.Navigation]; !ok {
+        //       groupedSampleConfigs[sc.Navigation] = []apiv1.ConfigSample{}
+        //     }
+        //     groupedSampleConfigs[sc.Navigation] = append(groupedSampleConfigs[sc.Navigation], sc)
+        //   }
 
+        //   return
 
-
-
-
-
-    // func (c *client) GetMeasurement(config apiv1.Config, lastMeasurement *contractsv1.Measurement) (measurement contractsv1.Measurement, err error) {
-
-    //   u := url.URL{Scheme: "ws", Host: fmt.Sprintf("%v:%v", c.host, c.port), Path: "/"}
-    
-    //   log.Info().Msgf("Dialing %v://%v%v...", u.Scheme, u.Host, u.Path)
-    
-    //   requestHeader := http.Header{
-    //     "Origin":                 []string{fmt.Sprintf("http://%v", u.Host)},
-    //     "Sec-WebSocket-Protocol": []string{"Lux_WS"},
-    //   }
-    
-    //   connection, resp, err := gwebsocket.DefaultDialer.Dial(u.String(), requestHeader)
-    //   if err != nil {
-    //     if err == gwebsocket.ErrBadHandshake {
-    //       if resp.Body != nil {
-    //         defer resp.Body.Close()
-    //         body, err := ioutil.ReadAll(resp.Body)
-    //         log.Debug().Str("body", string(body)).Err(err).Msgf("handshake failed body")
-    //       }
-    
-    //       log.Warn().Interface("response", resp.Body).Msgf("handshake failed with status %d", resp.StatusCode)
-    //     }
-    //     return
-    //   }
-    //   defer connection.Close()
-    
-    //   // set up handlers for sending commands and receiving responses
-    //   c.interrupt = make(chan os.Signal, 1)
-    //   signal.Notify(c.interrupt, os.Interrupt)
-    
-    //   c.done = make(chan struct{})
-    //   waitGroup := &sync.WaitGroup{}
-    
-    //   c.responseChannel = make(chan []byte)
-    //   go func() {
-    //     waitGroup.Add(1)
-    //     defer waitGroup.Done()
-    
-    //     if err := c.receiveResponse(connection); err != nil {
-    //       log.Error().Err(err).Msg("Failure receiving responses")
-    //     }
-    //   }()
-    
-    //   c.commandChannel = make(chan string)
-    //   go func() {
-    //     waitGroup.Add(1)
-    //     defer waitGroup.Done()
-    
-    //     if err := c.sendCommands(connection); err != nil {
-    //       log.Error().Err(err).Msg("Failure sending commands")
-    //     }
-    //   }()
-    
-    //   measurement = contractsv1.Measurement{
-    //     ID:             uuid.New().String(),
-    //     Source:         "jarvis-alpha-innotec-exporter",
-    //     Location:       config.Location,
-    //     Samples:        []*contractsv1.Sample{},
-    //     MeasuredAtTime: time.Now().UTC(),
-    //   }
-    
-    //   // login
-    //   navigation, err := c.login()
-    //   if err != nil {
-    //     return
-    //   }
-    
-    //   groupedSampleConfigs := c.groupSampleConfigsPerNavigation(config.SampleConfigs)
-    //   measurement.Samples, err = c.getSamples(config, groupedSampleConfigs, connection, navigation)
-    
-    //   if lastMeasurement != nil {
-    //     measurement.Samples = c.sanitizeSamples(measurement.Samples, lastMeasurement.Samples)
-    //   }
-    
-    //   log.Info().Msgf("Done issueing commands, stopping send/receive handlers...")
-    //   c.teardown = true
-    //   close(c.interrupt)
-    //   waitGroup.Wait()
-    
-    //   return
-    // }
-    
-    fn get_samples(&self, config: Config, grouped_sample_configs: map[string][]apiv1.ConfigSample, connection: *gwebsocket.Conn, navigation: Navigation) -> Result<Vec<Sample>, Box<dyn Error>> {
-      Ok(vec![])
+        grouped_sample_configs
     }
 
-    // func (c *client) getSamples(config apiv1.Config, groupedSampleConfigs map[string][]apiv1.ConfigSample, connection *gwebsocket.Conn, navigation Navigation) (samples []*contractsv1.Sample, err error) {
-    
-    //   samples = []*contractsv1.Sample{}
-    
-    //   for nav, sampleConfigs := range groupedSampleConfigs {
-    
-    //     log.Info().Msgf("Fetching values from page %v...", nav)
-    
-    //     // get id for navigation
-    //     navigationID, e := navigation.GetNavigationItemID(nav)
-    //     if e != nil {
-    //       return samples, e
-    //     }
-    
-    //     // get response for navigation item
-    //     response, e := c.sendAndAwait(fmt.Sprintf("GET;%v", navigationID))
-    //     if e != nil {
-    //       return samples, fmt.Errorf("Failed navigating to %v: %w", navigationID, e)
-    //     }
-    
-    //     log.Info().Msgf("Reading %v values from response for page %v...", len(sampleConfigs), nav)
-    
-    //     // get all requested values from navigation response
-    //     for _, sc := range sampleConfigs {
-    //       value, e := c.getItemFromResponse(sc.Item, response)
-    //       if e != nil {
-    //         return samples, e
-    //       }
-    
-    //       // init sample from config
-    //       sample := contractsv1.Sample{
-    //         EntityType: sc.EntityType,
-    //         EntityName: sc.EntityName,
-    //         SampleType: sc.SampleType,
-    //         SampleName: sc.SampleName,
-    //         MetricType: sc.MetricType,
-    //       }
-    
-    //       // convert sample to float and correct
-    //       sample.Value = value * sc.ValueMultiplier
-    
-    //       samples = append(samples, &sample)
-    //     }
-    //   }
-    
-    //   return
-    // }
-    
-    fn group_sample_configs_per_navigation(&self, sample_configs: Vec<SampleConfig>) -> map[string][]apiv1.ConfigSample {
-      Ok(map[string][]apiv1.ConfigSample)
+    fn send_and_await(
+        &self,
+        receiver: &mut websocket::receiver::Reader<std::net::TcpStream>,
+        sender: &mut websocket::sender::Writer<std::net::TcpStream>,
+        message: websocket::OwnedMessage,
+    ) -> Result<String, Box<dyn Error>> {
+        let _ = sender.send_message(&message)?;
+
+        for message in receiver.incoming_messages() {
+            match message? {
+                OwnedMessage::Text(text) => {
+                    return Ok(text);
+                }
+                OwnedMessage::Close(_) => {
+                    // return a close
+                    sender.send_message(&OwnedMessage::Close(None))?;
+                }
+                OwnedMessage::Ping(data) => {
+                    // return a pong
+                    sender.send_message(&OwnedMessage::Pong(data))?;
+                }
+                OwnedMessage::Pong(_) => {}
+                OwnedMessage::Binary(_) => {}
+            }
+        }
+
+        Err(Box::<dyn Error>::from(
+            "No response received for login message",
+        ))
     }
 
-    // func (c *client) groupSampleConfigsPerNavigation(sampleConfigs []apiv1.ConfigSample) (groupedSampleConfigs map[string][]apiv1.ConfigSample) {
-    
-    //   groupedSampleConfigs = map[string][]apiv1.ConfigSample{}
-    
-    //   for _, sc := range sampleConfigs {
-    //     if _, ok := groupedSampleConfigs[sc.Navigation]; !ok {
-    //       groupedSampleConfigs[sc.Navigation] = []apiv1.ConfigSample{}
-    //     }
-    //     groupedSampleConfigs[sc.Navigation] = append(groupedSampleConfigs[sc.Navigation], sc)
-    //   }
-    
-    //   return
-    // }
+    fn login(
+        &self,
+        receiver: &mut websocket::receiver::Reader<std::net::TcpStream>,
+        sender: &mut websocket::sender::Writer<std::net::TcpStream>,
+    ) -> Result<Navigation, Box<dyn Error>> {
+        let response_message = self.send_and_await(
+            receiver,
+            sender,
+            websocket::OwnedMessage::Text(format!("LOGIN;{}", self.config.login_code)),
+        )?;
 
-    fn receive_response(&self, connection *gwebsocket.Conn) -> Result<(), Box<dyn Error>> {
-      Ok(())
+        let navigation = self.get_navigation_from_response(response_message)?;
+
+        Ok(navigation)
     }
-    
-    // func (c *client) receiveResponse(connection *gwebsocket.Conn) (err error) {
-    //   defer close(c.done)
-    //   for {
-    //     var message []byte
-    //     _, message, err = connection.ReadMessage()
-    //     if c.teardown {
-    //       log.Info().Msg("Completing teardown of serial port listener")
-    //       return nil
-    //     }
-    
-    //     if err != nil {
-    //       if errors.Is(err, gwebsocket.ErrCloseSent) {
-    //         log.Debug().Msg("Connection close is sent")
-    //         return nil
-    //       }
-    //       log.Warn().Err(err).Msg("read error")
-    //       return
-    //     }
-    //     log.Debug().Msgf("read: %s", message)
-    //     if c.awaitingResponse {
-    //       c.responseChannel <- message
-    //     }
-    //   }
-    // }
 
-    fn send_commands(&self, connection: *gwebsocket.Conn) -> Result<(), Box<dyn Error>> {
-      Ok(())
+    fn get_samples(
+        &self,
+        grouped_sample_configs: HashMap<String, Vec<ConfigSample>>,
+        receiver: &mut websocket::receiver::Reader<std::net::TcpStream>,
+        sender: &mut websocket::sender::Writer<std::net::TcpStream>,
+
+        navigation: Navigation,
+    ) -> Result<Vec<Sample>, Box<dyn Error>> {
+        let mut samples = Vec::new();
+
+        for (nav, sample_configs) in grouped_sample_configs {
+            println!("Fetching values from page {}...", nav);
+            let navigation_id = navigation.get_navigation_item_id(&nav)?;
+            let response_message = self.send_and_await(
+                receiver,
+                sender,
+                websocket::OwnedMessage::Text(format!("GET;{}", navigation_id)),
+            )?;
+
+            println!(
+                "Reading {} values from response for page {}...",
+                sample_configs.len(),
+                nav
+            );
+            for sample_config in sample_configs.iter() {
+                let value = self.get_item_from_response(&sample_config.item, &response_message)?;
+
+                samples.push(Sample {
+                    entity_type: sample_config.entity_type,
+                    entity_name: sample_config.entity_name.clone(),
+                    sample_type: sample_config.sample_type,
+                    sample_name: sample_config.sample_name.clone(),
+                    metric_type: sample_config.metric_type,
+                    value: value * sample_config.value_multiplier,
+                });
+            }
+        }
+
+        Ok(samples)
     }
-    
-    // func (c *client) sendCommands(connection *gwebsocket.Conn) (err error) {
-    
-    //   ticker := time.NewTicker(time.Second)
-    //   defer ticker.Stop()
-    
-    //   for {
-    //     select {
-    //     case command := <-c.commandChannel:
-    //       err = connection.WriteMessage(gwebsocket.TextMessage, []byte(command))
-    //       if err != nil {
-    
-    //         log.Warn().Err(err).Msg("write error")
-    //         return
-    //       }
-    //       log.Debug().Msgf("write: %s", command)
-    
-    //     case <-c.done:
-    //       log.Info().Msg("done")
-    //       return
-    
-    //     case <-c.interrupt:
-    //       log.Info().Msg("interrupt")
-    
-    //       // Cleanly close the connection by sending a close message and then
-    //       // waiting (with timeout) for the server to close the connection.
-    //       err = connection.WriteMessage(gwebsocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-    //       if err != nil {
-    //         log.Warn().Err(err).Msg("write close error")
-    //         return
-    //       }
-    //       select {
-    //       case <-c.done:
-    //       case <-time.After(time.Second):
-    //       }
-    //       return
-    
-    //     case t := <-ticker.C:
-    //       err = connection.WriteMessage(gwebsocket.TextMessage, []byte(t.String()))
-    //       if err != nil {
-    //         log.Warn().Err(err).Msg("write error")
-    //         return
-    //       }
-    //     }
-    //   }
-    // }
 
+    fn get_navigation_from_response(
+        &self,
+        response_message: String,
+    ) -> Result<Navigation, Box<dyn Error>> {
+        let navigation: Navigation = from_str(&response_message)?;
 
-    fn send_and_await(&self, command: String) -> Result<Vec<u8>, Box<dyn Error>> {
-      Ok(vec![])
+        Ok(navigation)
     }
-    
-    // func (c *client) sendAndAwait(command string) (response []byte, err error) {
-    
-    //   c.awaitingResponse = true
-    //   defer func() { c.awaitingResponse = false }()
-    
-    //   // issue command
-    //   log.Info().Msgf("Issueing command: %v", command)
-    //   c.commandChannel <- command
-    
-    //   // await response
-    //   select {
-    //   case response = <-c.responseChannel:
-    //     log.Info().Msgf("Received response: %s", response)
-    //     return
-    //   case <-c.interrupt:
-    //     return
-    //   }
-    // }
 
-    fn login(&self) -> Result<Navigation, Box<dyn Error>> {
-      Ok(Navigation{})
-    }    
-    
-    // func (c *client) login() (navigation Navigation, err error) {
-    //   response, err := c.sendAndAwait(fmt.Sprintf("LOGIN;%v", c.loginCode))
-    //   if err != nil {
-    //     return navigation, fmt.Errorf("Failed logging in: %w", err)
-    //   }
-    
-    //   navigation, err = c.getNavigationFromResponse(response)
-    //   if err != nil {
-    //     return
-    //   }
-    
-    //   return
-    // }
-    
-    fn get_navigation_from_response(&self, response: Vec<u8>) -> Result<Navigation, Box<dyn Error>> {
-      Ok(Navigation{})
-    }    
-    
+    fn get_item_from_response(
+        &self,
+        item: &String,
+        response_message: &String,
+    ) -> Result<f64, Box<dyn Error>> {
+        // <Content><item id='0x4816ac'><name>Aanvoer</name><value>22.0°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>
 
-    // func (c *client) getNavigationFromResponse(response []byte) (navigation Navigation, err error) {
-    
-    //   err = xml.Unmarshal(response, &navigation)
-    //   if err != nil {
-    //     return
-    //   }
-    
-    //   return
-    // }
-    
-    fn get_item_from_response(&self, item: String, response: Vec<u8>) -> Result<f64, Box<dyn Error>> {
-      Ok(0.0)
-    }    
+        let re = Regex::new(&format!(
+            r"<item id='[^']*'><name>{}<\/name><value>(-?[0-9.]+|---)[^<]*<\/value><\/item>",
+            item
+        ))?;
+        let matches = match re.captures(&response_message) {
+            Some(m) => m,
+            None => {
+                return Err(Box::<dyn Error>::from(format!(
+                    "No match for item {}",
+                    item
+                )));
+            }
+        };
 
-    // func (c *client) getItemFromResponse(item string, response []byte) (value float64, err error) {
-    
-    //   // <Content><item id='0x4816ac'><name>Aanvoer</name><value>22.0°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>
-    
-    //   pattern := fmt.Sprintf(`<item id='[^']*'><name>%v<\/name><value>(-?[0-9.]+|---)[^<]*<\/value><\/item>`, item)
-    
-    //   re, err := regexp.Compile(pattern)
-    //   if err != nil {
-    //     return
-    //   }
-    
-    //   matches := re.FindStringSubmatch(string(response))
-    //   if err != nil {
-    //     return
-    //   }
-    
-    //   if len(matches) != 2 {
-    //     return value, fmt.Errorf("No match for item %v", item)
-    //   }
-    
-    //   if matches[1] == "---" {
-    //     return value, nil
-    //   }
-    
-    //   value, err = strconv.ParseFloat(matches[1], 64)
-    //   if err != nil {
-    //     return value, fmt.Errorf("Failed parsing float from item %v value %v: %w", item, value, err)
-    //   }
-    
-    //   return
-    // }
+        if matches.len() != 2 {
+            return Err(Box::<dyn Error>::from(format!(
+                "No match for item {}",
+                item
+            )));
+        }
+
+        return match matches.get(1) {
+            None => Ok(0.0),
+            Some(m) => {
+                let value = m.as_str();
+                if value == "---" {
+                    return Ok(0.0);
+                }
+                Ok(value.parse()?)
+            }
+        };
+    }
 
     fn sanitize_samples(
         &self,
@@ -474,48 +300,44 @@ impl WebsocketClient {
     }
 }
 
-
-// <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
-
-struct Navigation  {
-	xml_name: String,         // `xml:"Navigation"`
-	id:      String,           // `xml:"id,attr"`
-	items:   Vec<NavigationItem>, // `xml:"item"`
+#[derive(Debug, Deserialize)]
+struct Navigation {
+    id: String,                 // `xml:"id,attr"`
+    items: Vec<NavigationItem>, // `xml:"item"`
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename = "item")]
 struct NavigationItem {
-	xml_name: String, //         `xml:"item"`
-	id:      String, //           `xml:"id,attr"`
-	name:    String, //           `xml:"name"`
-	items:   Vec<NavigationItem>, // `xml:"item"`
+    id: String,                 //           `xml:"id,attr"`
+    name: String,               //           `xml:"name"`
+    items: Vec<NavigationItem>, // `xml:"item"`
 }
 
 impl Navigation {
-  fn get_navigation_item_id(&self, item_path: String) -> Result<String,Box<dyn Error>> {
-    // itemPathParts := strings.Split(itemPath, " > ")
-    // items := n.Items
-    // for _, p := range itemPathParts {
-    //   exists := false
-    //   for _, i := range items {
-    //     if p == i.Name {
-    //       exists = true
-    //       navigationID = i.ID
-    //       items = i.Items
-    //       break
-    //     }
-    //   }
-  
-    //   if !exists {
-    //     return navigationID, fmt.Errorf("Item %v does not exist", p)
-    //   }
-    // }
-  
-    // return
-    Ok("".to_string())
-  }
+    fn get_navigation_item_id(&self, item_path: &String) -> Result<String, Box<dyn Error>> {
+        // itemPathParts := strings.Split(itemPath, " > ")
+        // items := n.Items
+        // for _, p := range itemPathParts {
+        //   exists := false
+        //   for _, i := range items {
+        //     if p == i.Name {
+        //       exists = true
+        //       navigationID = i.ID
+        //       items = i.Items
+        //       break
+        //     }
+        //   }
+
+        //   if !exists {
+        //     return navigationID, fmt.Errorf("Item %v does not exist", p)
+        //   }
+        // }
+
+        // return
+        Ok("".to_string())
+    }
 }
-
-
 
 // func TestMarshal(t *testing.T) {
 // 	t.Run("ReturnsXmlString", func(t *testing.T) {
@@ -611,12 +433,6 @@ impl Navigation {
 // 	}
 
 // }
-
-
-
-
-
-
 
 // func TestGetMeasurement(t *testing.T) {
 // 	t.Run("ReturnsMeasurement", func(t *testing.T) {
@@ -733,3 +549,27 @@ impl Navigation {
 // 		assert.Equal(t, "0x45df90", navigation.Items[0].Items[0].ID)
 // 	})
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_() {
+        let xml_string = "<Navigation id=\"0x45cd88\"><item id=\"0x45df90\"><name>Informatie</name><item id=\"0x45df90\"><name>Temperaturen</name></item><item id=\"0x455968\"><name>Ingangen</name></item></item><item id=\"0x450798\"><name>Instelling</name></item><item id=\"0x3dc420\"><name>Klokprogramma</name></item><item id=\"0x45c7b0\"><name>Toegang: Gebruiker</name></item></Navigation>";
+
+        // act
+        let navigation: Navigation = from_str(xml_string).unwrap();
+
+        assert_eq!(navigation.items.len(), 4);
+        assert_eq!(navigation.items[0].name, "Informatie".to_string());
+        assert_eq!(navigation.items[0].items.len(), 1);
+        assert_eq!(
+            navigation.items[0].items[0].name,
+            "Temperaturen".to_string()
+        );
+        assert_eq!(navigation.items[0].items[0].id, "0x45df90".to_string());
+        assert_eq!(navigation.items[0].items[1].name, "Ingangen".to_string());
+        assert_eq!(navigation.items[0].items[1].id, "0x455968".to_string());
+    }
+}

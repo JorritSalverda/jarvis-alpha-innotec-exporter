@@ -18,7 +18,7 @@ pub struct BigqueryClientConfig {
     table: String,
     enable: bool,
     init: bool,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     client: gcp_bigquery_client::Client,
 }
 
@@ -31,21 +31,20 @@ impl BigqueryClientConfig {
         enable: bool,
         init: bool,
     ) -> Result<Self, Box<dyn Error>> {
-
         let client = gcp_bigquery_client::Client::from_service_account_key_file(
             &google_application_credentials,
         )
         .await;
 
         let config = Self {
-          project_id,
-          dataset,
-          table,
-          enable,
-          init,
-          client,
+            project_id,
+            dataset,
+            table,
+            enable,
+            init,
+            client,
         };
-        
+
         println!("{:?}", config);
 
         Ok(config)
