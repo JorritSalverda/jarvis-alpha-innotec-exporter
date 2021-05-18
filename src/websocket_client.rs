@@ -113,14 +113,20 @@ impl WebsocketClient {
     ) -> HashMap<String, Vec<ConfigSample>> {
         let mut grouped_sample_configs: HashMap<String, Vec<ConfigSample>> = HashMap::new();
 
-        //   for _, sc := range sampleConfigs {
-        //     if _, ok := groupedSampleConfigs[sc.Navigation]; !ok {
-        //       groupedSampleConfigs[sc.Navigation] = []apiv1.ConfigSample{}
-        //     }
-        //     groupedSampleConfigs[sc.Navigation] = append(groupedSampleConfigs[sc.Navigation], sc)
-        //   }
+        for sample_config in sample_configs.into_iter() {
+          if let None = grouped_sample_configs.get(&sample_config.navigation) {
+            grouped_sample_configs.insert(sample_config.navigation.clone(), vec![]);
+          }
 
-        //   return
+          match grouped_sample_configs.get_mut(&sample_config.navigation) {
+            Some(v) => {
+              v.push(sample_config);
+            },
+            None => {
+              grouped_sample_configs.insert(sample_config.navigation.clone(), vec![sample_config]);
+            }
+          }
+        }
 
         grouped_sample_configs
     }
@@ -230,7 +236,7 @@ impl WebsocketClient {
         // <Content><item id='0x4816ac'><name>Aanvoer</name><value>22.0°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>
 
         let re = Regex::new(&format!(
-            r"<item id='[^']*'><name>{}<\/name><value>(-?[0-9.]+|---)[^<]*<\/value><\/item>",
+            r"<item id='[^']*'><name>{}</name><value>(-?[0-9.]+|---)[^<]*</value></item>",
             item
         ))?;
         let matches = match re.captures(&response_message) {
@@ -303,233 +309,287 @@ impl WebsocketClient {
 #[derive(Debug, Deserialize)]
 struct Navigation {
     id: String,                 // `xml:"id,attr"`
+    #[serde(rename = "item", default)]
     items: Vec<NavigationItem>, // `xml:"item"`
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename = "item")]
 struct NavigationItem {
     id: String,                 //           `xml:"id,attr"`
     name: String,               //           `xml:"name"`
+    #[serde(rename = "item", default)]
     items: Vec<NavigationItem>, // `xml:"item"`
 }
 
 impl Navigation {
     fn get_navigation_item_id(&self, item_path: &String) -> Result<String, Box<dyn Error>> {
-        // itemPathParts := strings.Split(itemPath, " > ")
-        // items := n.Items
-        // for _, p := range itemPathParts {
-        //   exists := false
-        //   for _, i := range items {
-        //     if p == i.Name {
-        //       exists = true
-        //       navigationID = i.ID
-        //       items = i.Items
-        //       break
-        //     }
-        //   }
 
-        //   if !exists {
-        //     return navigationID, fmt.Errorf("Item %v does not exist", p)
-        //   }
-        // }
+      let item_path_parts: Vec<&str> = item_path.split(" > ").collect();
 
-        // return
-        Ok("".to_string())
+      let mut navigation_id: String = "".to_string();
+      let mut items = &self.items;
+
+      for part in item_path_parts.iter() {
+        let mut exists = false;
+        for item in items.iter() {
+          if part.to_string() == item.name {
+            exists = true;
+            
+            navigation_id = item.id.clone();
+            items = &item.items;
+
+            break
+          }
+        }
+
+        if !exists {
+          return Err(Box::<dyn Error>::from(
+            format!("Item {} does not exist", part),
+        ))
+        }
+      }
+
+      Ok(navigation_id)
     }
 }
 
-// func TestMarshal(t *testing.T) {
-// 	t.Run("ReturnsXmlString", func(t *testing.T) {
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{EntityType, MetricType, SampleType};
 
-// 		navigation := getNavigation()
+    #[test]
+    fn deserialize_navigation_xml() {
+        let xml_string = "<Navigation id=\"0x45cd88\"><item id=\"0x45df90\"><name>Informatie</name><item id=\"0x45df90\"><name>Temperaturen</name></item><item id=\"0x455968\"><name>Ingangen</name></item></item><item id=\"0x450798\"><name>Instelling</name></item><item id=\"0x3dc420\"><name>Klokprogramma</name></item><item id=\"0x45c7b0\"><name>Toegang: Gebruiker</name></item></Navigation>";
 
-// 		// act
-// 		xmlString, err := xml.Marshal(navigation)
+        // act
+        let navigation: Navigation = from_str(xml_string).unwrap();
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, "<Navigation id=\"0x45cd88\"><item id=\"0x45df90\"><name>Informatie</name><item id=\"0x45df90\"><name>Temperaturen</name></item><item id=\"0x455968\"><name>Ingangen</name></item></item><item id=\"0x450798\"><name>Instelling</name></item><item id=\"0x3dc420\"><name>Klokprogramma</name></item><item id=\"0x45c7b0\"><name>Toegang: Gebruiker</name></item></Navigation>", string(xmlString))
-// 	})
-// }
+        assert_eq!(navigation.items.len(), 4);
+        assert_eq!(navigation.items[0].name, "Informatie".to_string());
+        assert_eq!(navigation.items[0].items.len(), 2);
+        assert_eq!(navigation.items[0].items[0].name, "Temperaturen".to_string());
+        assert_eq!(navigation.items[0].items[0].id, "0x45df90".to_string());
+        assert_eq!(navigation.items[0].items[1].name, "Ingangen".to_string());
+        assert_eq!(navigation.items[0].items[1].id, "0x455968".to_string());
+    }
 
-// func TestUnmarshal(t *testing.T) {
-// 	t.Run("ReturnsXmlString", func(t *testing.T) {
+    #[test]
+    fn get_navigation_item_id_returns_id_if_it_exists() {
 
-// 		var navigation Navigation
-// 		xmlString := "<Navigation id=\"0x45cd88\"><item id=\"0x45df90\"><name>Informatie</name><item id=\"0x45df90\"><name>Temperaturen</name></item><item id=\"0x455968\"><name>Ingangen</name></item></item><item id=\"0x450798\"><name>Instelling</name></item><item id=\"0x3dc420\"><name>Klokprogramma</name></item><item id=\"0x45c7b0\"><name>Toegang: Gebruiker</name></item></Navigation>"
+      // <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
 
-// 		// act
-// 		err := xml.Unmarshal([]byte(xmlString), &navigation)
+      let navigation = Navigation{
+        id: "0x45cd88".to_string(),
+        items: vec![
+          NavigationItem{
+            id: "0x45df90".to_string(),
+            name: "Informatie".to_string(),
+            items: vec![
+              NavigationItem{
+                id: "0x45df90".to_string(),
+                name: "Temperaturen".to_string(),
+                items: vec![],
+              },
+              NavigationItem{
+                id: "0x455968".to_string(),
+                name: "Ingangen".to_string(),
+                items: vec![],
+              }
+            ],
+          },
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, 4, len(navigation.Items))
-// 		assert.Equal(t, "Informatie", navigation.Items[0].Name)
-// 		assert.Equal(t, 2, len(navigation.Items[0].Items))
-// 		assert.Equal(t, "Temperaturen", navigation.Items[0].Items[0].Name)
-// 		assert.Equal(t, "0x45df90", navigation.Items[0].Items[0].ID)
-// 		assert.Equal(t, "Ingangen", navigation.Items[0].Items[1].Name)
-// 		assert.Equal(t, "0x455968", navigation.Items[0].Items[1].ID)
-// 	})
-// }
+          NavigationItem{
+            id: "0x450798".to_string(),
+            name: "Instelling".to_string(),
+            items: vec![]
+          },
+          NavigationItem{
+            id: "0x3dc420".to_string(),
+            name: "Klokprogramma".to_string(),
+            items: vec![]
+          },
+          NavigationItem{
+            id: "0x45c7b0".to_string(),
+            name: "Toegang: Gebruiker".to_string(),
+            items: vec![]
+          },
 
-// func TestGetNavigationItemID(t *testing.T) {
-// 	t.Run("ReturnsItemAtTopLevel", func(t *testing.T) {
+        ]
+      };
 
-// 		navigation := getNavigation()
+      let item_id = navigation.get_navigation_item_id(&"Informatie".to_string()).unwrap();
 
-// 		// act
-// 		itemID, err := navigation.GetNavigationItemID("Informatie")
+      assert_eq!(item_id, "0x45df90".to_string());
+    }
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, "0x45df90", itemID)
-// 	})
+    #[test]
+    fn get_navigation_item_id_returns_id_if_it_exists_as_nested_item_inside_top_level_item() {
 
-// 	t.Run("ReturnsItemNestedInsideTopLevelItem", func(t *testing.T) { // <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
+      // <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
 
-// 		navigation := getNavigation()
+      let navigation = Navigation{
+        id: "0x45cd88".to_string(),
+        items: vec![
+          NavigationItem{
+            id: "0x45df90".to_string(),
+            name: "Informatie".to_string(),
+            items: vec![
+              NavigationItem{
+                id: "0x45df90".to_string(),
+                name: "Temperaturen".to_string(),
+                items: vec![],
+              },
+              NavigationItem{
+                id: "0x455968".to_string(),
+                name: "Ingangen".to_string(),
+                items: vec![],
+              }
+            ],
+          },
 
-// 		// act
-// 		itemID, err := navigation.GetNavigationItemID("Informatie > Ingangen")
+          NavigationItem{
+            id: "0x450798".to_string(),
+            name: "Instelling".to_string(),
+            items: vec![]
+          },
+          NavigationItem{
+            id: "0x3dc420".to_string(),
+            name: "Klokprogramma".to_string(),
+            items: vec![]
+          },
+          NavigationItem{
+            id: "0x45c7b0".to_string(),
+            name: "Toegang: Gebruiker".to_string(),
+            items: vec![]
+          },
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, "0x455968", itemID)
-// 	})
-// }
+        ]
+      };
 
-// func getNavigation() Navigation {
+      let item_id = navigation.get_navigation_item_id(&"Informatie > Ingangen".to_string()).unwrap();
 
-// 	// <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
+      assert_eq!(item_id, "0x455968".to_string());
+    }
 
-// 	return Navigation{
-// 		ID: "0x45cd88",
-// 		Items: []NavigationItem{
-// 			{
-// 				ID:   "0x45df90",
-// 				Name: "Informatie",
-// 				Items: []NavigationItem{
-// 					{
-// 						ID:   "0x45df90",
-// 						Name: "Temperaturen",
-// 					},
-// 					{
-// 						ID:   "0x455968",
-// 						Name: "Ingangen",
-// 					},
-// 				},
-// 			},
-// 			{
-// 				ID:   "0x450798",
-// 				Name: "Instelling",
-// 			},
-// 			{
-// 				ID:   "0x3dc420",
-// 				Name: "Klokprogramma",
-// 			},
-// 			{
-// 				ID:   "0x45c7b0",
-// 				Name: "Toegang: Gebruiker",
-// 			},
-// 		},
-// 	}
+    #[test]
+    fn get_item_from_response_returns_value_for_item_without_unit() {
 
-// }
+      let websocket_client = WebsocketClient::new(WebsocketClientConfig::new("192.168.178.94".to_string(), 8214, "999999".to_string()).unwrap());
 
-// func TestGetMeasurement(t *testing.T) {
-// 	t.Run("ReturnsMeasurement", func(t *testing.T) {
+      let response_message = "<Content><item id='0x4816ac'><name>Aanvoer</name><value>22.3°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>".to_string();
 
-// 		if testing.Short() {
-// 			t.Skip("skipping test in short mode.")
-// 		}
+      //act
+      let value = websocket_client.get_item_from_response(&"Aanvoer".to_string(), &response_message).unwrap();
 
-// 		client, err := NewClient("192.168.178.94", 8214, "999999")
-// 		assert.Nil(t, err)
+      assert_eq!(value, 22.3);
+    }
 
-// 		config := apiv1.Config{
-// 			Location: "My address",
-// 		}
+    #[test]
+    #[should_panic]
+    fn get_item_from_response_returns_error_if_item_id_is_not_in_response() {
 
-// 		// act
-// 		measurement, err := client.GetMeasurement(config, nil)
+      let websocket_client = WebsocketClient::new(WebsocketClientConfig::new("192.168.178.94".to_string(), 8214, "999999".to_string()).unwrap());
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, "My address", measurement.Location)
-// 	})
+      let response_message = "<Content><item id='0x4816ac'><name>Aanvoer</name><value>22.3°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>".to_string();
 
-// 	t.Run("ReturnsMeasurementWithSample", func(t *testing.T) {
+      //act
+      let _ = websocket_client.get_item_from_response(&"DoesNotExist".to_string(), &response_message).unwrap();
+    }
 
-// 		if testing.Short() {
-// 			t.Skip("skipping test in short mode.")
-// 		}
 
-// 		client, err := NewClient("192.168.178.94", 8214, "999999")
-// 		assert.Nil(t, err)
+    #[test]
+    fn get_item_from_response_returns_value_for_item_with_pressure_unit() {
 
-// 		config := apiv1.Config{
-// 			Location: "My address",
-// 			SampleConfigs: []apiv1.ConfigSample{
-// 				{
-// 					EntityType:      "ENTITY_TYPE_DEVICE",
-// 					EntityName:      "Alpha Innotec SWCV 92K3",
-// 					SampleType:      "SAMPLE_TYPE_TEMPERATURE",
-// 					SampleName:      "Aanvoer",
-// 					MetricType:      "METRIC_TYPE_GAUGE",
-// 					ValueMultiplier: 1,
-// 					Navigation:      "Informatie > Temperaturen",
-// 					Item:            "Aanvoer",
-// 				},
-// 			},
-// 		}
+      let websocket_client = WebsocketClient::new(WebsocketClientConfig::new("192.168.178.94".to_string(), 8214, "999999".to_string()).unwrap());
 
-// 		// act
-// 		measurement, err := client.GetMeasurement(config, nil)
+      let response_message = "<Content><item id='0x4e7944'><name>ASD</name><value>Aan</value></item><item id='0x4ffbfc'><name>EVU</name><value>Aan</value></item><item id='0x4ef3b4'><name>HD</name><value>Uit</value></item><item id='0x4dac64'><name>MOT</name><value>Aan</value></item><item id='0x4ca4c4'><name>SWT</name><value>Uit</value></item><item id='0x4fa864'><name>Analoog-In 21</name><value>0.00 V</value></item><item id='0x4d5f1c'><name>Analoog-In 22</name><value>0.00 V</value></item><item id='0x4e6a3c'><name>HD</name><value>8.10 bar</value></item><item id='0x4ca47c'><name>ND</name><value>8.38 bar</value></item><item id='0x4e8004'><name>Debiet</name><value>1200 l/h</value></item><name>Ingangen</name></Content>".to_string();
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, 1, len(measurement.Samples))
-// 		assert.Equal(t, "Alpha Innotec SWCV 92K3", measurement.Samples[0].EntityName)
-// 		assert.Equal(t, "Aanvoer", measurement.Samples[0].SampleName)
-// 		assert.Equal(t, contractsv1.MetricType_METRIC_TYPE_GAUGE, measurement.Samples[0].MetricType)
-// 	})
-// }
+      //act
+      let value = websocket_client.get_item_from_response(&"HD".to_string(), &response_message).unwrap();
 
-// func TestGetItemFromResponse(t *testing.T) {
-// 	t.Run("ReturnsValueForItemWithoutUnit", func(t *testing.T) {
+      assert_eq!(value, 8.10);
+    }
 
-// 		client := client{}
+    #[test]
+    fn group_sample_configs_per_navigation_returns_hashmap_with_grouped_sample_configs() {
 
-// 		response := `<Content><item id='0x4816ac'><name>Aanvoer</name><value>22.3°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>`
+      let sample_configs: Vec<ConfigSample> = vec![
+        ConfigSample{
+          entity_type: EntityType::Device,
+          entity_name: "Alpha Innotec SWCV 92K3".to_string(),
+          sample_type: SampleType::Temperature,
+          sample_name: "Aanvoer".to_string(),
+          metric_type: MetricType::Gauge,
+          value_multiplier: 1.0,
+          navigation: "Informatie > Temperaturen".to_string(),
+          item: "Aanvoer".to_string(),
+        },
+        ConfigSample{
+          entity_type: EntityType::Device,
+          entity_name: "Alpha Innotec SWCV 92K3".to_string(),
+          sample_type: SampleType::Temperature,
+          sample_name: "Retour".to_string(),
+          metric_type: MetricType::Gauge,
+          value_multiplier: 1.0,
+          navigation: "Informatie > Temperaturen".to_string(),
+          item: "Retour".to_string(),
+        },
+        ConfigSample{
+          entity_type: EntityType::Device,
+          entity_name: "Alpha Innotec SWCV 92K3".to_string(),
+          sample_type: SampleType::Energy,
+          sample_name: "Tapwater".to_string(),
+          metric_type: MetricType::Counter,
+          value_multiplier: 3600000.0,
+          navigation: "Informatie > Energie".to_string(),
+          item: "Warmwater".to_string(),
+        },
+      ];
 
-// 		// act
-// 		value, err := client.getItemFromResponse("Aanvoer", []byte(response))
+      let websocket_client = WebsocketClient::new(WebsocketClientConfig::new("192.168.178.94".to_string(), 8214, "999999".to_string()).unwrap());
 
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, float64(22.3), value)
-// 	})
+      let grouped_sample_configs = websocket_client.group_sample_configs_per_navigation(sample_configs);
 
-// 	t.Run("ReturnsErrorIfItemIdIsNotInResponse", func(t *testing.T) {
+      assert_eq!(grouped_sample_configs.len(), 2);
+      assert_eq!(grouped_sample_configs.get(&"Informatie > Temperaturen".to_string()).unwrap().len(), 2);
+      assert_eq!(grouped_sample_configs.get(&"Informatie > Energie".to_string()).unwrap().len(), 1);
+    }
 
-// 		client := client{}
+    #[test]
+    #[ignore]
+    fn get_measurement() {
 
-// 		response := `<Content><item id='0x4816ac'><name>Aanvoer</name><value>22.3°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>`
+      let websocket_client = WebsocketClient::new(WebsocketClientConfig::new("192.168.195.4".to_string(), 8214, "999999".to_string()).unwrap());
+      let config = Config{
+        location: "My address".to_string(),
+        sample_configs: vec![
+          ConfigSample{
+            entity_type: EntityType::Device,
+            entity_name: "Alpha Innotec SWCV 92K3".to_string(),
+            sample_type: SampleType::Temperature,
+            sample_name: "Aanvoer".to_string(),
+            metric_type: MetricType::Gauge,
+            value_multiplier: 1.0,
+            navigation: "Informatie > Temperaturen".to_string(),
+            item: "Aanvoer".to_string(),
+          },
+        ],
+    
+      };
 
-// 		// act
-// 		_, err := client.getItemFromResponse("BestaatNiet", []byte(response))
+      // act
+      let measurement = websocket_client.get_measurement(config, Option::None).unwrap();
 
-// 		assert.NotNil(t, err)
-// 	})
+      assert_eq!(measurement.samples.len(), 1);
+      assert_eq!(measurement.samples[0].entity_name, "Alpha Innotec SWCV 92K3".to_string());
+      assert_eq!(measurement.samples[0].sample_name, "Aanvoer".to_string());
+      assert_eq!(measurement.samples[0].metric_type, MetricType::Gauge);
+      // assert_eq!(measurement.samples[0].value, 0.0);
+    }
+}
 
-// 	t.Run("ReturnsValueForItemWithoutUnitForPressure", func(t *testing.T) {
 
-// 		client := client{}
-
-// 		response := `<Content><item id='0x4e7944'><name>ASD</name><value>Aan</value></item><item id='0x4ffbfc'><name>EVU</name><value>Aan</value></item><item id='0x4ef3b4'><name>HD</name><value>Uit</value></item><item id='0x4dac64'><name>MOT</name><value>Aan</value></item><item id='0x4ca4c4'><name>SWT</name><value>Uit</value></item><item id='0x4fa864'><name>Analoog-In 21</name><value>0.00 V</value></item><item id='0x4d5f1c'><name>Analoog-In 22</name><value>0.00 V</value></item><item id='0x4e6a3c'><name>HD</name><value>8.10 bar</value></item><item id='0x4ca47c'><name>ND</name><value>8.38 bar</value></item><item id='0x4e8004'><name>Debiet</name><value>1200 l/h</value></item><name>Ingangen</name></Content>`
-
-// 		// act
-// 		value, err := client.getItemFromResponse("HD", []byte(response))
-
-// 		assert.Nil(t, err)
-// 		assert.Equal(t, float64(8.10), value)
-// 	})
-// }
 
 // func TestGetNavigationFromResponse(t *testing.T) {
 // 	t.Run("ReturnsValueForItemWithoutUnit", func(t *testing.T) {
@@ -549,27 +609,3 @@ impl Navigation {
 // 		assert.Equal(t, "0x45df90", navigation.Items[0].Items[0].ID)
 // 	})
 // }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn deserialize_() {
-        let xml_string = "<Navigation id=\"0x45cd88\"><item id=\"0x45df90\"><name>Informatie</name><item id=\"0x45df90\"><name>Temperaturen</name></item><item id=\"0x455968\"><name>Ingangen</name></item></item><item id=\"0x450798\"><name>Instelling</name></item><item id=\"0x3dc420\"><name>Klokprogramma</name></item><item id=\"0x45c7b0\"><name>Toegang: Gebruiker</name></item></Navigation>";
-
-        // act
-        let navigation: Navigation = from_str(xml_string).unwrap();
-
-        assert_eq!(navigation.items.len(), 4);
-        assert_eq!(navigation.items[0].name, "Informatie".to_string());
-        assert_eq!(navigation.items[0].items.len(), 1);
-        assert_eq!(
-            navigation.items[0].items[0].name,
-            "Temperaturen".to_string()
-        );
-        assert_eq!(navigation.items[0].items[0].id, "0x45df90".to_string());
-        assert_eq!(navigation.items[0].items[1].name, "Ingangen".to_string());
-        assert_eq!(navigation.items[0].items[1].id, "0x455968".to_string());
-    }
-}
