@@ -5,6 +5,8 @@
 cronjob:
   schedule: '*/5 * * * *'
   concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 2
 
 config:
   websocketHostIP: 127.0.0.1
