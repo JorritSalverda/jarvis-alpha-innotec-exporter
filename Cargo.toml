@@ -24,6 +24,7 @@ derivative = "2.2"
 serde-xml-rs = "0.4"
 websocket = "0.26"
 regex = "1.5"
+jarvis-lib = { git = "https://github.com/JorritSalverda/jarvis-lib", tag = "0.1.5" }
 
 [target.x86_64-unknown-linux-musl.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }

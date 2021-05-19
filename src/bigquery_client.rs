@@ -2,13 +2,13 @@ use std::env;
 use std::error::Error;
 use std::{thread, time};
 
-use crate::model::Measurement;
 use derivative::Derivative;
 use gcp_bigquery_client::model::table::Table;
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use gcp_bigquery_client::model::table_field_schema::TableFieldSchema;
 use gcp_bigquery_client::model::table_schema::TableSchema;
 use gcp_bigquery_client::model::time_partitioning::TimePartitioning;
+use jarvis_lib::Measurement;
 
 #[derive(Derivative)]
 #[derivative(Debug)]

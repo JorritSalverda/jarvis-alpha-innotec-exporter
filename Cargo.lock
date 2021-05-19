@@ -738,6 +738,7 @@ dependencies = [
  "conv",
  "derivative",
  "gcp-bigquery-client",
+ "jarvis-lib",
  "k8s-openapi",
  "kube",
  "kube-runtime",
@@ -750,6 +751,15 @@ dependencies = [
  "tokio",
  "uuid",
  "websocket",
+]
+
+[[package]]
+name = "jarvis-lib"
+version = "0.1.0"
+source = "git+https://github.com/JorritSalverda/jarvis-lib?tag=0.1.5#d680c7747feb7d4cc8922b0647250440578471b2"
+dependencies = [
+ "chrono",
+ "serde",
 ]
 
 [[package]]
