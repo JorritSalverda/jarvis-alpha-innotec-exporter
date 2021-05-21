@@ -731,7 +731,7 @@ dependencies = [
 [[package]]
 name = "jarvis-lib"
 version = "0.1.0"
-source = "git+https://github.com/JorritSalverda/jarvis-lib?tag=0.1.15#e8a8d3a3d75de3c7248471f33c54026e0d7b7185"
+source = "git+https://github.com/JorritSalverda/jarvis-lib?tag=0.1.16#e4483c2edc9d72851cb56448de5007b1ac2dda2d"
 dependencies = [
  "chrono",
  "gcp-bigquery-client",
