@@ -1,4 +1,5 @@
-use jarvis_lib::{EntityType, MetricType, SampleType};
+use jarvis_lib::config_client::SetDefaults;
+use jarvis_lib::model::{EntityType, MetricType, SampleType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -8,8 +9,8 @@ pub struct Config {
     pub sample_configs: Vec<ConfigSample>,
 }
 
-impl Config {
-    pub fn set_defaults(&mut self) {
+impl SetDefaults for Config {
+    fn set_defaults(&mut self) {
         for sample_config in self.sample_configs.iter_mut() {
             sample_config.set_defaults()
         }
@@ -37,5 +38,41 @@ impl ConfigSample {
         if self.value_multiplier == 0.0 {
             self.value_multiplier = 1.0;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jarvis_lib::config_client::{ConfigClient, ConfigClientConfig};
+    use jarvis_lib::model::{EntityType, MetricType, SampleType};
+
+    #[test]
+    fn read_config_from_file_returns_deserialized_test_file() {
+        let config_client =
+            ConfigClient::new(ConfigClientConfig::new("test-config.yaml".to_string()).unwrap());
+
+        let config: Config = config_client.read_config_from_file().unwrap();
+
+        assert_eq!(config.location, "My Home".to_string());
+        assert_eq!(config.sample_configs.len(), 2);
+        assert_eq!(config.sample_configs[0].entity_type, EntityType::Device);
+        assert_eq!(
+            config.sample_configs[0].entity_name,
+            "Alpha Innotec SWCV 92K3".to_string()
+        );
+        assert_eq!(
+            config.sample_configs[0].sample_type,
+            SampleType::Temperature
+        );
+        assert_eq!(config.sample_configs[0].sample_name, "Aanvoer".to_string());
+        assert_eq!(config.sample_configs[0].metric_type, MetricType::Gauge);
+
+        assert_eq!(config.sample_configs[0].value_multiplier, 1.0);
+        assert_eq!(
+            config.sample_configs[0].navigation,
+            "Informatie > Temperaturen".to_string()
+        );
+        assert_eq!(config.sample_configs[0].item, "Aanvoer".to_string());
     }
 }

@@ -1,5 +1,6 @@
 use crate::model::{Config, ConfigSample};
-use jarvis_lib::{Measurement, MetricType, Sample};
+use jarvis_lib::measurement_client::MeasurementClient;
+use jarvis_lib::model::{Measurement, MetricType, Sample};
 
 use chrono::Utc;
 use regex::Regex;
@@ -52,12 +53,8 @@ pub struct WebsocketClient {
     config: WebsocketClientConfig,
 }
 
-impl WebsocketClient {
-    pub fn new(config: WebsocketClientConfig) -> Self {
-        Self { config }
-    }
-
-    pub fn get_measurement(
+impl MeasurementClient<Config> for WebsocketClient {
+    fn get_measurement(
         &self,
         config: Config,
         last_measurement: Option<Measurement>,
@@ -106,6 +103,12 @@ impl WebsocketClient {
         println!("Read measurement from alpha innotec heatpump");
 
         Ok(measurement)
+    }
+}
+
+impl WebsocketClient {
+    pub fn new(config: WebsocketClientConfig) -> Self {
+        Self { config }
     }
 
     fn group_sample_configs_per_navigation(
@@ -358,7 +361,7 @@ impl Navigation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jarvis_lib::{EntityType, MetricType, SampleType};
+    use jarvis_lib::model::{EntityType, MetricType, SampleType};
 
     #[test]
     fn deserialize_navigation_xml() {

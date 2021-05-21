@@ -1,14 +1,10 @@
-mod bigquery_client;
-mod config_client;
-mod exporter_service;
 mod model;
-mod state_client;
 mod websocket_client;
 
-use bigquery_client::{BigqueryClient, BigqueryClientConfig};
-use config_client::{ConfigClient, ConfigClientConfig};
-use exporter_service::{ExporterService, ExporterServiceConfig};
-use state_client::{StateClient, StateClientConfig};
+use jarvis_lib::bigquery_client::{BigqueryClient, BigqueryClientConfig};
+use jarvis_lib::config_client::{ConfigClient, ConfigClientConfig};
+use jarvis_lib::exporter_service::{ExporterService, ExporterServiceConfig};
+use jarvis_lib::state_client::{StateClient, StateClientConfig};
 use websocket_client::{WebsocketClient, WebsocketClientConfig};
 
 #[tokio::main]
@@ -29,7 +25,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config_client,
         bigquery_client,
         state_client,
-        websocket_client,
+        Box::new(websocket_client),
     )?;
     let exporter_service = ExporterService::new(exporter_service_config);
 
