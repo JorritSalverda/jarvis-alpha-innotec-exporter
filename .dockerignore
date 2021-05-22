@@ -4,6 +4,7 @@ target
 
 .dockerignore
 .estafette.yaml
+.gitignore
 Dockerfile
 LICENSE
 README.md
