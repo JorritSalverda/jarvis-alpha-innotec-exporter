@@ -39,9 +39,9 @@ impl WebsocketClientConfig {
     }
 
     pub fn from_env() -> Result<Self, Box<dyn Error>> {
-        let host_address = env::var("WEBSOCKET_HOST_IP").unwrap_or("127.0.0.1".to_string());
+        let host_address = env::var("WEBSOCKET_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string());
         let host_port: u32 = env::var("WEBSOCKET_HOST_PORT")
-            .unwrap_or("8214".to_string())
+            .unwrap_or_else(|_| "8214".to_string())
             .parse()?;
         let login_code = env::var("WEBSOCKET_LOGIN_CODE")?;
 
@@ -93,11 +93,8 @@ impl MeasurementClient<Config> for WebsocketClient {
             navigation,
         )?;
 
-        match last_measurement {
-            Some(lm) => {
-                measurement.samples = self.sanitize_samples(measurement.samples, lm.samples)
-            }
-            None => {}
+        if let Some(lm) = last_measurement {
+            measurement.samples = self.sanitize_samples(measurement.samples, lm.samples)
         }
 
         println!("Read measurement from alpha innotec heatpump");
@@ -118,7 +115,7 @@ impl WebsocketClient {
         let mut grouped_sample_configs: HashMap<String, Vec<ConfigSample>> = HashMap::new();
 
         for sample_config in sample_configs.into_iter() {
-            if let None = grouped_sample_configs.get(&sample_config.navigation) {
+            if grouped_sample_configs.get(&sample_config.navigation).is_none() {
                 grouped_sample_configs.insert(sample_config.navigation.clone(), vec![]);
             }
 
@@ -235,8 +232,8 @@ impl WebsocketClient {
 
     fn get_item_from_response(
         &self,
-        item: &String,
-        response_message: &String,
+        item: &str,
+        response_message: &str,
     ) -> Result<f64, Box<dyn Error>> {
         // <Content><item id='0x4816ac'><name>Aanvoer</name><value>22.0°C</value></item><item id='0x44fdcc'><name>Retour</name><value>22.0°C</value></item><item id='0x4807dc'><name>Retour berekend</name><value>23.0°C</value></item><item id='0x45e1bc'><name>Heetgas</name><value>38.0°C</value></item><item id='0x448894'><name>Buitentemperatuur</name><value>11.6°C</value></item><item id='0x48047c'><name>Gemiddelde temp.</name><value>13.1°C</value></item><item id='0x457724'><name>Tapwater gemeten</name><value>54.2°C</value></item><item id='0x45e97c'><name>Tapwater ingesteld</name><value>57.0°C</value></item><item id='0x45a41c'><name>Bron-in</name><value>10.5°C</value></item><item id='0x480204'><name>Bron-uit</name><value>10.3°C</value></item><item id='0x4803cc'><name>Menggroep2-aanvoer</name><value>22.0°C</value></item><item id='0x4609cc'><name>Menggr2-aanv.ingest.</name><value>19.0°C</value></item><item id='0x45a514'><name>Zonnecollector</name><value>5.0°C</value></item><item id='0x461ecc'><name>Zonneboiler</name><value>150.0°C</value></item><item id='0x4817a4'><name>Externe energiebron</name><value>5.0°C</value></item><item id='0x4646b4'><name>Aanvoer max.</name><value>66.0°C</value></item><item id='0x45e76c'><name>Zuiggasleiding comp.</name><value>19.4°C</value></item><item id='0x4607d4'><name>Comp. verwarming</name><value>37.7°C</value></item><item id='0x43e60c'><name>Oververhitting</name><value>4.8 K</value></item><name>Temperaturen</name></Content>
 
@@ -244,7 +241,7 @@ impl WebsocketClient {
             r"<item id='[^']*'><name>{}</name><value>(-?[0-9.]+|---)[^<]*</value></item>",
             item
         ))?;
-        let matches = match re.captures(&response_message) {
+        let matches = match re.captures(response_message) {
             Some(m) => m,
             None => {
                 return Err(Box::<dyn Error>::from(format!(
@@ -313,7 +310,7 @@ impl WebsocketClient {
 
 #[derive(Debug, Deserialize)]
 struct Navigation {
-    id: String, // `xml:"id,attr"`
+    // id: String, // `xml:"id,attr"`
     #[serde(rename = "item", default)]
     items: Vec<NavigationItem>, // `xml:"item"`
 }
@@ -327,7 +324,7 @@ struct NavigationItem {
 }
 
 impl Navigation {
-    fn get_navigation_item_id(&self, item_path: &String) -> Result<String, Box<dyn Error>> {
+    fn get_navigation_item_id(&self, item_path: &str) -> Result<String, Box<dyn Error>> {
         let item_path_parts: Vec<&str> = item_path.split(" > ").collect();
 
         let mut navigation_id: String = "".to_string();
@@ -336,7 +333,7 @@ impl Navigation {
         for part in item_path_parts.iter() {
             let mut exists = false;
             for item in items.iter() {
-                if part.to_string() == item.name {
+                if *part == item.name {
                     exists = true;
 
                     navigation_id = item.id.clone();
@@ -387,7 +384,7 @@ mod tests {
         // <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
 
         let navigation = Navigation {
-            id: "0x45cd88".to_string(),
+            // id: "0x45cd88".to_string(),
             items: vec![
                 NavigationItem {
                     id: "0x45df90".to_string(),
@@ -435,7 +432,7 @@ mod tests {
         // <Navigation id='0x45cd88'><item id='0x45e068'><name>Informatie</name><item id='0x45df90'><name>Temperaturen</name></item><item id='0x455968'><name>Ingangen</name></item><item id='0x455760'><name>Uitgangen</name></item><item id='0x45bf10'><name>Aflooptijden</name></item><item id='0x456f08'><name>Bedrijfsuren</name></item><item id='0x4643a8'><name>Storingsbuffer</name></item><item id='0x3ddfa8'><name>Afschakelingen</name></item><item id='0x45d840'><name>Installatiestatus</name></item><item id='0x460cb8'><name>Energie</name></item><item id='0x4586a8'><name>GBS</name></item></item><item id='0x450798'><name>Instelling</name><item id='0x460bd0'><name>Bedrijfsmode</name></item><item id='0x461170'><name>Temperaturen</name></item><item id='0x462988'><name>Systeeminstelling</name></item></item><item id='0x3dc420'><name>Klokprogramma</name><readOnly>true</readOnly><item id='0x453560'><name>Verwarmen</name><readOnly>true</readOnly><item id='0x45e118'><name>Week</name></item><item id='0x45df00'><name>5+2</name></item><item id='0x45c200'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x43e8e8'><name>Warmwater</name><readOnly>true</readOnly><item id='0x4642a8'><name>Week</name></item><item id='0x463940'><name>5+2</name></item><item id='0x463b68'><name>Dagen (Ma, Di,...)</name></item></item><item id='0x3dcc00'><name>Zwembad</name><readOnly>true</readOnly><item id='0x455580'><name>Week</name></item><item id='0x463f78'><name>5+2</name></item><item id='0x462690'><name>Dagen (Ma, Di,...)</name></item></item></item><item id='0x45c7b0'><name>Toegang: Gebruiker</name></item></Navigation>
 
         let navigation = Navigation {
-            id: "0x45cd88".to_string(),
+            // id: "0x45cd88".to_string(),
             items: vec![
                 NavigationItem {
                     id: "0x45df90".to_string(),
