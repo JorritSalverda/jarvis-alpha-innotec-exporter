@@ -1,10 +1,2 @@
-.git
-helm
+.github
 target
-
-.dockerignore
-.estafette.yaml
-.gitignore
-Dockerfile
-LICENSE
-README.md
