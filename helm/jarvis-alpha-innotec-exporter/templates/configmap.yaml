@@ -8,11 +8,8 @@ data:
   websocket-host-ip: {{ .Values.config.websocketHostIP | quote }}
   websocket-host-port: {{ .Values.config.websocketHostPort | quote }}
   websocket-login-code: {{ .Values.config.websocketLoginCode | quote }}
-  bq-enable: {{ .Values.config.bqEnable | quote }}
-  bq-init: {{ .Values.config.bqInit | quote }}
-  bq-project-id: {{ .Values.config.bqProjectID | quote }}
-  bq-dataset: {{ .Values.config.bqDataset | quote }}
-  bq-table: {{ .Values.config.bqTable | quote }}
+  nats-host:  {{ .Values.config.natsHost | quote }}
+  nats-subject:  {{ .Values.config.natsSubject | quote }}
   config.yaml: |
     {{- with .Values.config.configYaml }}
     {{- tpl . $ | nindent 4 }}

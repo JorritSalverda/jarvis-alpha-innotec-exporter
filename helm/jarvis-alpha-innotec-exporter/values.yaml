@@ -13,11 +13,8 @@ config:
   websocketHostIP: 127.0.0.1
   websocketHostPort: 8214
   websocketLoginCode: 999999
-  bqEnable: false
-  bqInit: true
-  bqProjectID: gcp-project-id
-  bqDataset: jarvis
-  bqTable: jarvis_measurements
+  natsHost: jarvis-nats
+  natsSubject: jarvis-measurements
   configYaml: |
     location: My Home
     sampleConfigs:
@@ -37,9 +34,6 @@ config:
       valueMultiplier: 1
       navigation: Informatie > Temperaturen
       item: Retour
-
-secret:
-  gcpServiceAccountKeyfile: '{}'
 
 logFormat: json
 

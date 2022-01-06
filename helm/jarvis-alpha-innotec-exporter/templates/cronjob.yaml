@@ -58,42 +58,23 @@ spec:
                 configMapKeyRef:
                   key: websocket-login-code
                   name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-            - name: BQ_ENABLE
+            - name: NATS_HOST
               valueFrom:
                 configMapKeyRef:
-                  key: bq-enable
-                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-            - name: BQ_INIT
+                  name: {{ include "jarvis-p1-exporter.fullname" . }}
+                  key: nats-host
+            - name: NATS_SUBJECT
               valueFrom:
                 configMapKeyRef:
-                  key: bq-init
-                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-            - name: BQ_PROJECT_ID
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-                  key: bq-project-id
-            - name: BQ_DATASET
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-                  key: bq-dataset
-            - name: BQ_TABLE
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-                  key: bq-table
+                  name: {{ include "jarvis-p1-exporter.fullname" . }}
+                  key: nats-subject
             - name: MEASUREMENT_FILE_CONFIG_MAP_NAME
               value: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /secrets/keyfile.json
             resources:
               {{- toYaml .Values.resources | nindent 14 }}
             volumeMounts:
             - name: configs
               mountPath: /configs
-            - name: secrets
-              mountPath: /secrets
           {{- with .Values.nodeSelector }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}
@@ -111,7 +92,3 @@ spec:
           - name: configs
             configMap:
               name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
-          - name: secrets
-            secret:
-              defaultMode: 420
-              secretName: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
