@@ -61,12 +61,12 @@ spec:
             - name: NATS_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "jarvis-p1-exporter.fullname" . }}
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
                   key: nats-host
             - name: NATS_SUBJECT
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "jarvis-p1-exporter.fullname" . }}
+                  name: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
                   key: nats-subject
             - name: MEASUREMENT_FILE_CONFIG_MAP_NAME
               value: {{ include "jarvis-alpha-innotec-exporter.fullname" . }}
