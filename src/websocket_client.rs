@@ -39,7 +39,8 @@ impl WebsocketClientConfig {
     }
 
     pub fn from_env() -> Result<Self, Box<dyn Error>> {
-        let host_address = env::var("WEBSOCKET_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let host_address =
+            env::var("WEBSOCKET_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string());
         let host_port: u32 = env::var("WEBSOCKET_HOST_PORT")
             .unwrap_or_else(|_| "8214".to_string())
             .parse()?;
@@ -115,7 +116,10 @@ impl WebsocketClient {
         let mut grouped_sample_configs: HashMap<String, Vec<ConfigSample>> = HashMap::new();
 
         for sample_config in sample_configs.into_iter() {
-            if grouped_sample_configs.get(&sample_config.navigation).is_none() {
+            if grouped_sample_configs
+                .get(&sample_config.navigation)
+                .is_none()
+            {
                 grouped_sample_configs.insert(sample_config.navigation.clone(), vec![]);
             }
 

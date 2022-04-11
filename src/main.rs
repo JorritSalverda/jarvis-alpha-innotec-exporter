@@ -1,9 +1,9 @@
 mod model;
 mod websocket_client;
 
-use jarvis_lib::nats_client::{NatsClient, NatsClientConfig};
 use jarvis_lib::config_client::{ConfigClient, ConfigClientConfig};
 use jarvis_lib::exporter_service::{ExporterService, ExporterServiceConfig};
+use jarvis_lib::nats_client::{NatsClient, NatsClientConfig};
 use jarvis_lib::state_client::{StateClient, StateClientConfig};
 use websocket_client::{WebsocketClient, WebsocketClientConfig};
 
