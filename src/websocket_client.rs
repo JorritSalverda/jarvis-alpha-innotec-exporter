@@ -1,8 +1,8 @@
 use crate::model::{Config, ConfigSample};
+use chrono::Utc;
 use jarvis_lib::measurement_client::MeasurementClient;
 use jarvis_lib::model::{Measurement, MetricType, Sample};
-
-use chrono::Utc;
+use log::{debug, info};
 use regex::Regex;
 use serde::Deserialize;
 use serde_xml_rs::from_str;
@@ -33,7 +33,7 @@ impl WebsocketClientConfig {
             login_code,
         };
 
-        println!("{:?}", config);
+        debug!("{:?}", config);
 
         Ok(config)
     }
@@ -60,7 +60,7 @@ impl MeasurementClient<Config> for WebsocketClient {
         config: Config,
         last_measurement: Option<Measurement>,
     ) -> Result<Measurement, Box<dyn Error>> {
-        println!("Reading measurement from alpha innotec heatpump...");
+        info!("Reading measurement from alpha innotec heatpump...");
 
         let mut measurement = Measurement {
             id: Uuid::new_v4().to_string(),
@@ -98,7 +98,7 @@ impl MeasurementClient<Config> for WebsocketClient {
             measurement.samples = self.sanitize_samples(measurement.samples, lm.samples)
         }
 
-        println!("Read measurement from alpha innotec heatpump");
+        info!("Read measurement from alpha innotec heatpump");
 
         Ok(measurement)
     }
@@ -195,7 +195,7 @@ impl WebsocketClient {
         let mut samples = Vec::new();
 
         for (nav, sample_configs) in grouped_sample_configs {
-            println!("Fetching values from page {}...", nav);
+            info!("Fetching values from page {}...", nav);
             let navigation_id = navigation.get_navigation_item_id(&nav)?;
             let response_message = self.send_and_await(
                 receiver,
@@ -203,7 +203,7 @@ impl WebsocketClient {
                 websocket::OwnedMessage::Text(format!("GET;{}", navigation_id)),
             )?;
 
-            println!(
+            info!(
                 "Reading {} values from response for page {}...",
                 sample_configs.len(),
                 nav
@@ -295,7 +295,7 @@ impl WebsocketClient {
                         && current_sample.value / last_sample.value > 1.1
                     {
                         sanitize = true;
-                        println!("Value for {} is more than 10 percent larger than the last sampled value {}, keeping previous value instead", current_sample.sample_name, last_sample.value);
+                        info!("Value for {} is more than 10 percent larger than the last sampled value {}, keeping previous value instead", current_sample.sample_name, last_sample.value);
                         sanitized_samples.push(last_sample.clone());
                     }
 

@@ -9,6 +9,8 @@ use websocket_client::{WebsocketClient, WebsocketClientConfig};
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    json_env_logger::init();
+
     let websocket_client_config = WebsocketClientConfig::from_env()?;
     let websocket_client = WebsocketClient::new(websocket_client_config);
 
@@ -27,7 +29,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         state_client,
         Box::new(websocket_client),
     )?;
-    let exporter_service = ExporterService::new(exporter_service_config);
+    let mut exporter_service = ExporterService::new(exporter_service_config);
 
     exporter_service.run().await?;
 
