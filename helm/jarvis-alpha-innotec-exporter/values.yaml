@@ -35,7 +35,7 @@ config:
       navigation: Informatie > Temperaturen
       item: Retour
 
-logFormat: json
+logLevel: debug
 
 image:
   repository: jsalverda/jarvis-alpha-innotec-exporter
