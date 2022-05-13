@@ -17,4 +17,4 @@ uuid = { version = "0.8", features = ["v4"] }
 serde-xml-rs = "0.4"
 websocket = "0.26"
 regex = "1.5"
-jarvis-lib = { git = "https://github.com/JorritSalverda/jarvis-lib", tag = "0.1.25" }
+jarvis-lib = { git = "https://github.com/JorritSalverda/jarvis-lib", tag = "0.1.44" }
