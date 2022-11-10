@@ -9,7 +9,10 @@ use websocket_client::{WebsocketClient, WebsocketClientConfig};
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    json_env_logger::init();
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let websocket_client_config = WebsocketClientConfig::from_env()?;
     let websocket_client = WebsocketClient::new(websocket_client_config);

@@ -2,13 +2,13 @@ use crate::model::{Config, ConfigSample};
 use chrono::Utc;
 use jarvis_lib::measurement_client::MeasurementClient;
 use jarvis_lib::model::{Measurement, MetricType, Sample};
-use log::{debug, info};
 use regex::Regex;
 use serde::Deserialize;
 use serde_xml_rs::from_str;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use websocket::client::ClientBuilder;
@@ -55,12 +55,12 @@ pub struct WebsocketClient {
 }
 
 impl MeasurementClient<Config> for WebsocketClient {
-    fn get_measurement(
+    fn get_measurements(
         &self,
         config: Config,
-        last_measurement: Option<Measurement>,
-    ) -> Result<Measurement, Box<dyn Error>> {
-        info!("Reading measurement from alpha innotec heatpump...");
+        last_measurement: Option<Vec<Measurement>>,
+    ) -> Result<Vec<Measurement>, Box<dyn Error>> {
+        info!("Reading measurements from alpha innotec heatpump...");
 
         let mut measurement = Measurement {
             id: Uuid::new_v4().to_string(),
@@ -95,12 +95,15 @@ impl MeasurementClient<Config> for WebsocketClient {
         )?;
 
         if let Some(lm) = last_measurement {
-            measurement.samples = self.sanitize_samples(measurement.samples, lm.samples)
+            if !lm.is_empty() {
+                measurement.samples =
+                    self.sanitize_samples(measurement.samples, &lm[lm.len() - 1].samples)
+            }
         }
 
         info!("Read measurement from alpha innotec heatpump");
 
-        Ok(measurement)
+        Ok(vec![measurement])
     }
 }
 
@@ -143,7 +146,7 @@ impl WebsocketClient {
         sender: &mut websocket::sender::Writer<std::net::TcpStream>,
         message: websocket::OwnedMessage,
     ) -> Result<String, Box<dyn Error>> {
-        let _ = sender.send_message(&message)?;
+        sender.send_message(&message)?;
 
         for message in receiver.incoming_messages() {
             match message? {
@@ -277,7 +280,7 @@ impl WebsocketClient {
     fn sanitize_samples(
         &self,
         current_samples: Vec<Sample>,
-        last_samples: Vec<Sample>,
+        last_samples: &[Sample],
     ) -> Vec<Sample> {
         let mut sanitized_samples: Vec<Sample> = Vec::new();
 
@@ -611,17 +614,21 @@ mod tests {
         };
 
         // act
-        let measurement = websocket_client
-            .get_measurement(config, Option::None)
+        let measurements = websocket_client
+            .get_measurements(config, Option::None)
             .unwrap();
 
-        assert_eq!(measurement.samples.len(), 1);
+        assert_eq!(measurements.len(), 1);
+        assert_eq!(measurements[0].samples.len(), 1);
         assert_eq!(
-            measurement.samples[0].entity_name,
+            measurements[0].samples[0].entity_name,
             "Alpha Innotec SWCV 92K3".to_string()
         );
-        assert_eq!(measurement.samples[0].sample_name, "Aanvoer".to_string());
-        assert_eq!(measurement.samples[0].metric_type, MetricType::Gauge);
+        assert_eq!(
+            measurements[0].samples[0].sample_name,
+            "Aanvoer".to_string()
+        );
+        assert_eq!(measurements[0].samples[0].metric_type, MetricType::Gauge);
         // assert_eq!(measurement.samples[0].value, 0.0);
     }
 }
