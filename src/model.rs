@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub location: String,
+    pub sanitize_samples: bool,
     pub sample_configs: Vec<ConfigSample>,
 }
 

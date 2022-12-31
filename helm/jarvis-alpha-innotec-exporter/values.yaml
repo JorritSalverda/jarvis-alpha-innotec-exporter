@@ -17,6 +17,7 @@ config:
   natsSubject: jarvis-measurements
   configYaml: |
     location: My Home
+    sanitizeSamples: false
     sampleConfigs:
     - entityType: ENTITY_TYPE_DEVICE
       entityName: Alpha Innotec SWCV 92K3

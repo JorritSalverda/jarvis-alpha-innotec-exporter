@@ -94,10 +94,12 @@ impl MeasurementClient<Config> for WebsocketClient {
             navigation,
         )?;
 
-        if let Some(lm) = last_measurement {
-            if !lm.is_empty() {
-                measurement.samples =
-                    self.sanitize_samples(measurement.samples, &lm[lm.len() - 1].samples)
+        if config.sanitize_samples {
+            if let Some(lm) = last_measurement {
+                if !lm.is_empty() {
+                    measurement.samples =
+                        self.sanitize_samples(measurement.samples, &lm[lm.len() - 1].samples)
+                }
             }
         }
 
@@ -295,6 +297,7 @@ impl WebsocketClient {
                     && current_sample.metric_type == last_sample.metric_type
                 {
                     if current_sample.metric_type == MetricType::Counter
+                        && last_sample.value > 0.0
                         && current_sample.value / last_sample.value > 1.1
                     {
                         sanitize = true;
@@ -601,6 +604,7 @@ mod tests {
         );
         let config = Config {
             location: "My address".to_string(),
+            sanitize_samples: false,
             sample_configs: vec![ConfigSample {
                 entity_type: EntityType::Device,
                 entity_name: "Alpha Innotec SWCV 92K3".to_string(),
